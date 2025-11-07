@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import AgoraRTC, {
   IAgoraRTCClient,
   ICameraVideoTrack,
@@ -9,6 +9,18 @@ import AgoraRTC, {
   ILocalVideoTrack,
 } from "agora-rtc-sdk-ng";
 import { AGORA_APP_ID } from "@/lib/agora";
+import {
+  Camera,
+  CameraOff,
+  Mic,
+  MicOff,
+  RefreshCw,
+  Play,
+  Square,
+  User,
+  Users,
+  Loader2,
+} from "lucide-react";
 
 type Props = {
   channel: string;
@@ -43,7 +55,56 @@ export default function VideoCall({
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [busy, setBusy] = useState(false);
 
-  // Mount local video into a fresh container
+  // UI states
+  const [videoEnabled, setVideoEnabled] = useState(true);
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [facing, setFacing] = useState<Facing>("user");
+
+  // ---------- UI helpers ----------
+  const ControlButton = ({
+    active = true,
+    intent = "neutral",
+    disabled,
+    onClick,
+    title,
+    children,
+  }: {
+    active?: boolean;
+    intent?: "neutral" | "primary" | "danger";
+    disabled?: boolean;
+    onClick?: () => void;
+    title?: string;
+    children: React.ReactNode;
+  }) => {
+    const base =
+      "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-0";
+    const intentClass =
+      intent === "primary"
+        ? "bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-400"
+        : intent === "danger"
+        ? "bg-red-600 text-white hover:bg-red-700 focus:ring-red-400"
+        : "bg-white/90 hover:bg-white shadow-sm border border-gray-200";
+    const stateClass = active ? "" : "opacity-60";
+    return (
+      <button
+        type="button"
+        title={title}
+        disabled={disabled}
+        onClick={onClick}
+        className={`${base} ${intentClass} ${stateClass} disabled:opacity-50 disabled:pointer-events-none`}
+      >
+        {children}
+      </button>
+    );
+  };
+
+  const Badge = ({ children }: { children: React.ReactNode }) => (
+    <span className="inline-flex items-center gap-1 rounded-full bg-black/60 text-white text-xs font-medium px-2 py-1 backdrop-blur">
+      {children}
+    </span>
+  );
+
+  // ---------- Core helpers ----------
   const playLocalInto = useCallback((track: ILocalVideoTrack) => {
     if (!containerRef.current) return;
     const el = document.createElement("div");
@@ -82,7 +143,6 @@ export default function VideoCall({
   }, [client]);
 
   const refreshDevices = useCallback(async () => {
-    // After we’ve created any media track once, labels will be populated.
     const devs = await AgoraRTC.getCameras();
     setCameras(devs);
     return devs;
@@ -101,7 +161,6 @@ export default function VideoCall({
       setLocalAudioTrack(mic);
       setLocalVideoTrack(cam);
       playLocalInto(cam);
-      // refresh device labels after permission
       await refreshDevices();
       return { mic, cam };
     },
@@ -130,6 +189,9 @@ export default function VideoCall({
         await client.publish([mic, cam]);
         attachRemoteHandlers();
         setJoinedChannel(ch);
+        setFacing(initialFacing);
+        setVideoEnabled(true);
+        setAudioEnabled(true);
       } finally {
         setBusy(false);
       }
@@ -150,20 +212,17 @@ export default function VideoCall({
     }
   }, [client, destroyLocalTracks]);
 
-  /** ---------- Facing helpers ---------- */
+  // ---------- Facing helpers ----------
   const guessDeviceForFacing = useCallback(
-    (facing: Facing) => {
-      // Try to find by label keywords (works on most phones after permission)
-      const labelNeedles =
-        facing === "user"
-          ? ["front", "user", "facing front"]
-          : ["back", "rear", "environment", "facing back"];
+    (want: Facing) => {
+      const needles =
+        want === "user" ? ["front", "user", "facing front"] : ["back", "rear", "environment"];
       const lowered = cameras.map((d) => ({
         ...d,
         _label: (d.label || "").toLowerCase(),
       }));
       const hit = lowered.find(
-        (d) => d.kind === "videoinput" && labelNeedles.some((n) => d._label.includes(n))
+        (d) => d.kind === "videoinput" && needles.some((n) => d._label.includes(n))
       );
       return hit?.deviceId;
     },
@@ -171,34 +230,32 @@ export default function VideoCall({
   );
 
   const switchToFacing = useCallback(
-    async (facing: Facing) => {
+    async (want: Facing) => {
       if (!localVideoTrack) return;
-
       setBusy(true);
       try {
-        // 1) Prefer hot switch to an actual deviceId if we can guess it
-        const devId = guessDeviceForFacing(facing);
+        const devId = guessDeviceForFacing(want);
         if (devId) {
           try {
             await localVideoTrack.setDevice(devId);
             playLocalInto(localVideoTrack);
+            setFacing(want);
             return;
           } catch {
-            /* fall through to recreate */
+            /* fallback below */
           }
         }
-
-        // 2) Fallback: recreate the track with facingMode
         try {
           await client.unpublish(localVideoTrack);
         } catch {}
         localVideoTrack.stop();
         localVideoTrack.close();
 
-        const newCam = await AgoraRTC.createCameraVideoTrack({ facingMode: facing });
+        const newCam = await AgoraRTC.createCameraVideoTrack({ facingMode: want });
         await client.publish(newCam);
         setLocalVideoTrack(newCam);
         playLocalInto(newCam);
+        setFacing(want);
         await refreshDevices();
       } finally {
         setBusy(false);
@@ -207,7 +264,7 @@ export default function VideoCall({
     [client, guessDeviceForFacing, localVideoTrack, playLocalInto, refreshDevices]
   );
 
-  /** ---------- Next Stranger (leave -> fetch -> join) ---------- */
+  // ---------- Next stranger ----------
   const nextStranger = useCallback(async () => {
     if (!getNextStranger) {
       await leaveChannel();
@@ -218,19 +275,16 @@ export default function VideoCall({
     const { channel: newChannel, uid: maybeUid } = await getNextStranger();
     const nextUid = typeof maybeUid === "number" ? maybeUid : uid;
     setUid(nextUid);
-    // default to "user" when rejoining; change if you prefer to remember last facing
-    await joinChannel(newChannel, nextUid, "user");
-  }, [getNextStranger, joinChannel, leaveChannel, onLeave, uid]);
+    await joinChannel(newChannel, nextUid, facing); // keep the last facing
+  }, [getNextStranger, joinChannel, leaveChannel, onLeave, uid, facing]);
 
-  /** ---------- Initial boot ---------- */
+  // ---------- Init ----------
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Join initial channel with front camera by default
       await joinChannel(channel, uid, "user");
       if (!cancelled) await refreshDevices();
     })();
-
     return () => {
       cancelled = true;
       (async () => {
@@ -240,82 +294,124 @@ export default function VideoCall({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** ---------- Basic controls ---------- */
+  // ---------- Toggles with UI sync ----------
+  const toggleVideo = async (enable: boolean) => {
+    if (!localVideoTrack) return;
+    await localVideoTrack.setEnabled(enable);
+    setVideoEnabled(enable);
+  };
+  const toggleAudio = async (enable: boolean) => {
+    if (!localAudioTrack) return;
+    await localAudioTrack.setEnabled(enable);
+    setAudioEnabled(enable);
+  };
+
   const leave = async () => {
     await leaveChannel();
     onLeave?.();
   };
 
+  // ---------- Render ----------
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full h-[70vh]">
-      <div ref={remoteRef} className="bg-black rounded-xl overflow-hidden" />
-      <div ref={containerRef} className="bg-black rounded-xl overflow-hidden" />
+    <div className="w-full h-[78vh] md:h-[76vh]">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Badge>
+            <Users className="h-3.5 w-3.5" />
+            <span>{joinedChannel ? "Live" : "Ready"}</span>
+          </Badge>
+          <span className="text-xs text-gray-600">
+            Channel: <b>{joinedChannel || channel}</b> · UID: <b>{uid}</b>
+          </span>
+        </div>
+        {busy && (
+          <div className="inline-flex items-center gap-2 text-xs text-gray-600">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Working…
+          </div>
+        )}
+      </div>
 
-      <div className="md:col-span-2 flex flex-wrap justify-center gap-3">
-        {/* Mic/Camera toggles */}
-        <button
-          onClick={() => localVideoTrack?.setEnabled(false)}
-          className="px-4 py-2 bg-gray-200 rounded-md"
-          disabled={busy}
-        >
-          Cam Off
-        </button>
-        <button
-          onClick={() => localVideoTrack?.setEnabled(true)}
-          className="px-4 py-2 bg-gray-200 rounded-md"
-          disabled={busy}
-        >
-          Cam On
-        </button>
-        <button
-          onClick={() => localAudioTrack?.setEnabled(false)}
-          className="px-4 py-2 bg-gray-200 rounded-md"
-          disabled={busy}
-        >
-          Mute
-        </button>
-        <button
-          onClick={() => localAudioTrack?.setEnabled(true)}
-          className="px-4 py-2 bg-gray-200 rounded-md"
-          disabled={busy}
-        >
-          Unmute
-        </button>
+      {/* Video stage */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[calc(100%-4.5rem)]">
+        {/* Remote */}
+        <div className="relative rounded-2xl overflow-hidden bg-black shadow-sm ring-1 ring-gray-200">
+          <div ref={remoteRef} className="absolute inset-0" />
+          {/* Overlay label */}
+          <div className="pointer-events-none absolute left-3 top-3">
+            <Badge>
+              <User className="h-3.5 w-3.5" />
+              Stranger
+            </Badge>
+          </div>
+          {/* subtle gradient edge */}
+          <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/10 via-transparent to-black/10" />
+        </div>
 
-        {/* NEW: Explicit Front / Back */}
-        <button
-          onClick={() => switchToFacing("user")}
-          className="px-4 py-2 bg-gray-200 rounded-md"
-          disabled={busy}
-          title="Use front/selfie camera"
-        >
-          Front Camera
-        </button>
-        <button
-          onClick={() => switchToFacing("environment")}
-          className="px-4 py-2 bg-gray-200 rounded-md"
-          disabled={busy}
-          title="Use back/rear camera"
-        >
-          Back Camera
-        </button>
+        {/* Local */}
+        <div className="relative rounded-2xl overflow-hidden bg-black shadow-sm ring-1 ring-gray-200">
+          <div ref={containerRef} className="absolute inset-0" />
+          <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2">
+            <Badge>
+              <User className="h-3.5 w-3.5" />
+              You
+            </Badge>
+            <Badge>{facing === "user" ? "Front" : "Back"}</Badge>
+          </div>
+          <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/10 via-transparent to-black/10" />
+        </div>
 
-        {/* Optional: Next stranger */}
-        <button
-          onClick={nextStranger}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md"
-          disabled={busy}
-        >
-          Next (Change Stranger)
-        </button>
+        {/* Controls */}
+        <div className="md:col-span-2">
+          <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl bg-white/70 backdrop-blur p-3 ring-1 ring-gray-200 shadow-sm">
+            <ControlButton
+              active={videoEnabled}
+              onClick={() => toggleVideo(!videoEnabled)}
+              title={videoEnabled ? "Turn camera off" : "Turn camera on"}
+            >
+              {videoEnabled ? <Camera className="h-4 w-4" /> : <CameraOff className="h-4 w-4" />}
+              {videoEnabled ? "Cam On" : "Cam Off"}
+            </ControlButton>
 
-        <button
-          onClick={leave}
-          className="px-4 py-2 bg-red-600 text-white rounded-md"
-          disabled={busy}
-        >
-          Leave
-        </button>
+            <ControlButton
+              active={audioEnabled}
+              onClick={() => toggleAudio(!audioEnabled)}
+              title={audioEnabled ? "Mute mic" : "Unmute mic"}
+            >
+              {audioEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+              {audioEnabled ? "Mic On" : "Muted"}
+            </ControlButton>
+
+            <ControlButton
+              onClick={() => switchToFacing("user")}
+              title="Use front/selfie camera"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Front
+            </ControlButton>
+
+            <ControlButton
+              onClick={() => switchToFacing("environment")}
+              title="Use back/rear camera"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Back
+            </ControlButton>
+
+            {getNextStranger && (
+              <ControlButton intent="primary" onClick={nextStranger} title="Match next user">
+                <Play className="h-4 w-4" />
+                Next (Change Stranger)
+              </ControlButton>
+            )}
+
+            <ControlButton intent="danger" onClick={leave} title="Leave call">
+              <Square className="h-4 w-4" />
+              Leave
+            </ControlButton>
+          </div>
+        </div>
       </div>
     </div>
   );
