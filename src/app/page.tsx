@@ -5,16 +5,30 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import SwipeStack from "@/components/SwipeStack";
 import MatchButton from "@/components/MatchButton";
 
+// Helper: explicitly ask permissions early (so users see the prompt on the home page)
+async function preflightPermissions() {
+  if (!navigator?.mediaDevices?.getUserMedia) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    // immediately stop tracks; actual tracks will be created on the call page
+    stream.getTracks().forEach(t => t.stop());
+  } catch {
+    // user denied or device missing — handle on call page too
+  }
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "waiting" | "pairing" | "paired">("idle");
   const uid = useMemo(() => Math.floor(Math.random() * 10_000_000), []);
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const tryPair = async () => {
     setStatus("pairing");
+
     const res = await fetch("/api/match", {
       method: "POST",
+      headers: { "content-type": "application/json" }, // ✅ important
       body: JSON.stringify({ uid }),
     });
     const data = await res.json();
@@ -24,17 +38,19 @@ export default function HomePage() {
       router.push(`/call/${data.channel}?uid=${uid}`);
       return;
     }
+
     if (data.status === "waiting") {
       setStatus("waiting");
-      // start polling to try again every 3s
+      // poll every 3s
       pollRef.current = setInterval(async () => {
         const again = await fetch("/api/match", {
           method: "POST",
+          headers: { "content-type": "application/json" },
           body: JSON.stringify({ uid }),
         });
         const result = await again.json();
         if (result.status === "paired" && result.channel) {
-          clearInterval(pollRef.current!);
+          if (pollRef.current) clearInterval(pollRef.current);
           setStatus("paired");
           router.push(`/call/${result.channel}?uid=${uid}`);
         }
@@ -42,7 +58,11 @@ export default function HomePage() {
     }
   };
 
-  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+  useEffect(() => {
+    // Ask for cam/mic early so users see the prompt immediately
+    preflightPermissions();
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-linear-to-b from-gray-50 to-white">
