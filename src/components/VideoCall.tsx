@@ -21,7 +21,8 @@ import {
   Users,
   Loader2,
   Wifi,
-  SkipForward, // ⬅️ NEW: icon for Skip button
+  SkipForward,
+  Dot,
 } from "lucide-react";
 
 type Props = {
@@ -70,85 +71,46 @@ export default function VideoCall({
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [facing, setFacing] = useState<Facing>("user");
 
-  // NEW: prevent double-trigger while switching strangers
+  // Guard for rapid skip
   const [isSwitching, setIsSwitching] = useState(false);
 
-  // ---------- UI helpers ----------
-  const ControlButton = ({
-    active = true,
-    intent = "neutral",
-    disabled,
+  // ---------- UI atoms ----------
+  const Pill = ({
+    children,
+    bg = "bg-black/60",
+  }: {
+    children: React.ReactNode;
+    bg?: string;
+  }) => (
+    <span className={`inline-flex items-center gap-1 rounded-full ${bg} text-white text-xs font-medium px-2 py-1 backdrop-blur`}>
+      {children}
+    </span>
+  );
+
+  const RoundBtn = ({
     onClick,
     title,
+    intent = "neutral",
+    disabled,
     children,
   }: {
-    active?: boolean;
-    intent?: "neutral" | "primary" | "danger";
-    disabled?: boolean;
     onClick?: () => void;
     title?: string;
+    intent?: "neutral" | "primary" | "danger";
+    disabled?: boolean;
     children: React.ReactNode;
   }) => {
-    const base =
-      "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-offset-0";
-    const intentClass =
+    const base = "grid place-items-center rounded-full w-12 h-12 md:w-14 md:h-14 shadow-lg transition-all focus:outline-none disabled:opacity-50 disabled:pointer-events-none";
+    const style =
       intent === "primary"
-        ? "text-white"
+        ? { background: `linear-gradient(135deg, ${ACCENT.primary}, ${ACCENT.primaryDark})`, color: "#fff", boxShadow: "0 8px 22px rgba(108,92,231,0.35)" }
         : intent === "danger"
-        ? "text-white"
-        : "text-gray-800";
-    const bg =
-      intent === "primary"
-        ? ""
-        : intent === "danger"
-        ? ""
-        : "bg-white/80 hover:bg-white/95 border border-white/60 shadow-sm";
-    const stateClass = active ? "" : "opacity-60";
+        ? { background: `linear-gradient(135deg, ${ACCENT.danger}, #b91c1c)`, color: "#fff", boxShadow: "0 8px 22px rgba(239,68,68,0.35)" }
+        : { background: "rgba(255,255,255,0.85)" };
     return (
-      <button
-        type="button"
-        title={title}
-        disabled={disabled}
-        onClick={onClick}
-        className={`${base} ${bg} ${intentClass} ${stateClass} disabled:opacity-50 disabled:pointer-events-none`}
-        style={
-          intent === "primary"
-            ? {
-                background: `linear-gradient(135deg, ${ACCENT.primary} 0%, ${ACCENT.primaryDark} 100%)`,
-                boxShadow: "0 8px 22px rgba(108,92,231,0.35)",
-              }
-            : intent === "danger"
-            ? {
-                background: `linear-gradient(135deg, ${ACCENT.danger} 0%, #b91c1c 100%)`,
-                boxShadow: "0 8px 22px rgba(239,68,68,0.35)",
-              }
-            : {}
-        }
-      >
+      <button type="button" title={title} onClick={onClick} disabled={disabled} className={base} style={style}>
         {children}
       </button>
-    );
-  };
-
-  const Badge = ({
-    children,
-    tone = "neutral" as "neutral" | "live" | "muted" | "camoff",
-  }: {
-    children: React.ReactNode;
-    tone?: "neutral" | "live" | "muted" | "camoff";
-  }) => {
-    const tones: Record<typeof tone, string> = {
-      neutral: "bg-black/60",
-      live: "bg-green-600/80",
-      muted: "bg-yellow-600/80",
-      camoff: "bg-red-600/80",
-    } as any;
-    return (
-      <span
-        className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium px-2 py-1 backdrop-blur ${tones[tone]}`}
-      >
-        {children}
-      </span>
     );
   };
 
@@ -260,15 +222,12 @@ export default function VideoCall({
     }
   }, [client, destroyLocalTracks]);
 
-  // ---------- Facing helpers ----------
+  // ---------- Facing ----------
   const guessDeviceForFacing = useCallback(
     (want: Facing) => {
       const needles =
         want === "user" ? ["front", "user", "facing front"] : ["back", "rear", "environment"];
-      const lowered = cameras.map((d) => ({
-        ...d,
-        _label: (d.label || "").toLowerCase(),
-      }));
+      const lowered = cameras.map((d) => ({ ...d, _label: (d.label || "").toLowerCase() }));
       const hit = lowered.find(
         (d) => d.kind === "videoinput" && needles.some((n) => d._label.includes(n))
       );
@@ -289,9 +248,7 @@ export default function VideoCall({
             playLocalInto(localVideoTrack);
             setFacing(want);
             return;
-          } catch {
-            /* fallback below */
-          }
+          } catch {}
         }
         try {
           await client.unpublish(localVideoTrack);
@@ -312,7 +269,7 @@ export default function VideoCall({
     [client, guessDeviceForFacing, localVideoTrack, playLocalInto, refreshDevices]
   );
 
-  // ---------- Next/Skip stranger ----------
+  // ---------- Next/Skip ----------
   const nextStranger = useCallback(async () => {
     if (!getNextStranger) {
       await leaveChannel();
@@ -323,10 +280,9 @@ export default function VideoCall({
     const { channel: newChannel, uid: maybeUid } = await getNextStranger();
     const nextUid = typeof maybeUid === "number" ? maybeUid : uid;
     setUid(nextUid);
-    await joinChannel(newChannel, nextUid, facing); // keep last facing
+    await joinChannel(newChannel, nextUid, facing);
   }, [getNextStranger, joinChannel, leaveChannel, onLeave, uid, facing]);
 
-  // NEW: dedicated “Skip Stranger” that guards against rapid re-clicks
   const skipStranger = useCallback(async () => {
     if (!getNextStranger || isSwitching || busy) return;
     setIsSwitching(true);
@@ -337,7 +293,7 @@ export default function VideoCall({
     }
   }, [getNextStranger, isSwitching, busy, nextStranger]);
 
-  // Keyboard shortcuts: S or Shift+N to skip
+  // Shortcuts: S or Shift+N
   useEffect(() => {
     if (!getNextStranger) return;
     const onKey = (e: KeyboardEvent) => {
@@ -367,7 +323,7 @@ export default function VideoCall({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---------- Toggles with UI sync ----------
+  // ---------- Toggles ----------
   const toggleVideo = async (enable: boolean) => {
     if (!localVideoTrack) return;
     await localVideoTrack.setEnabled(enable);
@@ -384,176 +340,175 @@ export default function VideoCall({
     onLeave?.();
   };
 
-  // ---------- Render ----------
-  const statusTone = joinedChannel ? "live" : "neutral";
+  const statusTone = joinedChannel ? "bg-green-600/80" : "bg-black/60";
 
+  // ---------- RENDER (Reels-style) ----------
   return (
-    <div
-      className="w-full h-[78vh] md:h-[76vh] rounded-3xl p-4 md:p-5"
-      style={{
-        background:
-          "linear-gradient(135deg, rgba(108,92,231,0.10) 0%, rgba(255,255,255,0.45) 35%, rgba(108,92,231,0.10) 100%)",
-        border: "1px solid rgba(255,255,255,0.5)",
-        backdropFilter: "blur(8px)",
-      }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2 md:gap-3">
-          <Badge tone={statusTone as any}>
-            <Users className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{joinedChannel ? "Live" : "Ready"}</span>
-          </Badge>
-          {!audioEnabled && (
-            <Badge tone="muted">
-              <MicOff className="h-3.5 w-3.5" />
-              Muted
-            </Badge>
-          )}
-          {!videoEnabled && (
-            <Badge tone="camoff">
-              <CameraOff className="h-3.5 w-3.5" />
-              Camera Off
-            </Badge>
-          )}
-          <span className="text-xs md:text-sm text-gray-700/90">
-            <b className="text-gray-900">Channel:</b> {joinedChannel || channel}
-            <span className="mx-2 text-gray-400">•</span>
-            <b className="text-gray-900">UID:</b> {uid}
-          </span>
-        </div>
+    <div className="w-full grid place-items-center">
+      <div
+        className="
+          relative overflow-hidden rounded-[28px]
+          w-full max-w-[1100px]
+          h-[86vh] md:h-[80vh]
+          mx-auto
+          bg-linear-to-br from-white/60 via-white/30 to-white/60
+          ring-1 ring-white/50 backdrop-blur
+          shadow-[0_20px_60px_-20px_rgba(108,92,231,0.35)]
+        "
+      >
+        {/* Top bar (Reels-like) */}
+        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 sm:px-4 py-2">
+          <div className="flex items-center gap-2">
+            <Pill bg={statusTone}>
+              <Dot className="h-4 w-4" />
+              {joinedChannel ? "Live" : "Ready"}
+            </Pill>
+            {!audioEnabled && (
+              <Pill bg="bg-yellow-600/80">
+                <MicOff className="h-3.5 w-3.5" />
+                Muted
+              </Pill>
+            )}
+            {!videoEnabled && (
+              <Pill bg="bg-red-600/80">
+                <CameraOff className="h-3.5 w-3.5" />
+                Cam Off
+              </Pill>
+            )}
+          </div>
 
-        <div className="hidden md:flex items-center gap-2 text-xs text-gray-600">
-          <Wifi className="h-4 w-4 opacity-80" />
-          <span>RTC Connected</span>
-          {(busy || isSwitching) && (
-            <>
-              <span className="mx-1 text-gray-300">•</span>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{isSwitching ? "Matching…" : "Working…"}</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Video stage */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[calc(100%-5.25rem)]">
-        {/* Remote */}
-        <div className="relative rounded-2xl p-0.5 bg-linear-to-br from-white/70 via-white/30 to-white/70 shadow-[0_10px_40px_-12px_rgba(108,92,231,0.35)]">
-          <div className="relative rounded-2xl overflow-hidden bg-black/95 ring-1 ring-white/10 h-full">
-            <div ref={remoteRef} className="absolute inset-0" />
-            <div className="pointer-events-none absolute left-3 top-3">
-              <Badge>
-                <User className="h-3.5 w-3.5" />
-                Stranger
-              </Badge>
-            </div>
-            <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/25 via-transparent to-black/25" />
-            <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5 rounded-2xl" />
+          <div className="hidden md:flex items-center gap-2 text-xs text-gray-700">
+            <Wifi className="h-4 w-4 opacity-80" />
+            <span>RTC</span>
+            {(busy || isSwitching) && (
+              <>
+                <span className="mx-1 text-gray-300">•</span>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{isSwitching ? "Matching…" : "Working…"}</span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Local */}
-        <div className="relative rounded-2xl p-0.5 bg-linear-to-br from-white/70 via-white/30 to-white/70 shadow-[0_10px_40px_-12px_rgba(108,92,231,0.35)]">
-          <div className="relative rounded-2xl overflow-hidden bg-black/95 ring-1 ring-white/10 h-full">
+        {/* Stage: ALWAYS half/half */}
+        <div
+          className="
+            absolute inset-0
+            grid
+            grid-rows-2 md:grid-rows-1 md:grid-cols-2
+          "
+        >
+          {/* Stranger */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-black/95 ring-1 ring-white/10" />
+            <div ref={remoteRef} className="absolute inset-0" />
+            <div className="absolute left-3 top-3 z-10">
+              <Pill>
+                <User className="h-3.5 w-3.5" />
+                Stranger
+              </Pill>
+            </div>
+            <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-black/20" />
+            <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5" />
+          </div>
+
+          {/* You */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-black/95 ring-1 ring-white/10" />
             <div ref={containerRef} className="absolute inset-0" />
-            <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2">
-              <Badge>
+            <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
+              <Pill>
                 <User className="h-3.5 w-3.5" />
                 You
-              </Badge>
-              <Badge>{facing === "user" ? "Front" : "Back"}</Badge>
+              </Pill>
+              <Pill>{facing === "user" ? "Front" : "Back"}</Pill>
             </div>
             {!videoEnabled && (
-              <div className="absolute inset-0 grid place-items-center bg-black/70 text-white">
+              <div className="absolute inset-0 grid place-items-center bg-black/70 text-white z-10">
                 <div className="flex flex-col items-center gap-2">
                   <CameraOff className="h-8 w-8 opacity-80" />
                   <span className="text-sm">Camera is turned off</span>
                 </div>
               </div>
             )}
-            <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/25 via-transparent to-black/25" />
-            <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5 rounded-2xl" />
+            <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-black/20" />
+            <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5" />
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="md:col-span-2">
-          <div
-            className="flex flex-wrap items-center justify-center gap-3 rounded-2xl p-3 ring-1 ring-white/50 shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
-            style={{
-              background: `linear-gradient(180deg, ${ACCENT.surface} 0%, ${ACCENT.surfaceHover} 100%)`,
-              backdropFilter: "blur(10px)",
-            }}
-          >
-            <ControlButton
-              active={videoEnabled}
-              onClick={() => toggleVideo(!videoEnabled)}
-              title={videoEnabled ? "Turn camera off" : "Turn camera on"}
-            >
-              {videoEnabled ? <Camera className="h-4 w-4" /> : <CameraOff className="h-4 w-4" />}
-              {videoEnabled ? "Cam On" : "Cam Off"}
-            </ControlButton>
-
-            <ControlButton
-              active={audioEnabled}
-              onClick={() => toggleAudio(!audioEnabled)}
-              title={audioEnabled ? "Mute mic" : "Unmute mic"}
-            >
-              {audioEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-              {audioEnabled ? "Mic On" : "Muted"}
-            </ControlButton>
-
-            <ControlButton onClick={() => switchToFacing("user")} title="Use front/selfie camera">
-              <RefreshCw className="h-4 w-4" />
-              Front
-            </ControlButton>
-
-            <ControlButton
-              onClick={() => switchToFacing("environment")}
-              title="Use back/rear camera"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Back
-            </ControlButton>
-
-            {getNextStranger && (
-              <>
-                {/* Existing Next button retained */}
-                <ControlButton
-                  intent="primary"
-                  onClick={nextStranger}
-                  title="Match next user"
-                  disabled={busy || isSwitching}
-                >
-                  <Play className="h-4 w-4" />
-                  Next (Change Stranger)
-                </ControlButton>
-
-                {/* NEW: Skip Stranger (auto-leave & auto-join) */}
-                <ControlButton
-                  intent="primary"
-                  onClick={skipStranger}
-                  title="Skip & auto-join new stranger (S or Shift+N)"
-                  disabled={busy || isSwitching}
-                >
-                  {isSwitching ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <SkipForward className="h-4 w-4" />
-                  )}
-                  {isSwitching ? "Matching…" : "Skip Stranger"}
-                </ControlButton>
-              </>
-            )}
-
-            <ControlButton intent="danger" onClick={leave} title="Leave call">
-              <Square className="h-4 w-4" />
-              Leave
-            </ControlButton>
-          </div>
+        {/* Right overlay stack (Reels-style actions) */}
+        <div className="absolute right-3 sm:right-4 bottom-28 md:bottom-8 z-30 flex flex-col items-center gap-3">
           {getNextStranger && (
-            <p className="mt-2 text-center text-xs text-gray-600">
+            <>
+              <RoundBtn
+                intent="primary"
+                onClick={skipStranger}
+                title="Skip (S or Shift+N)"
+                disabled={busy || isSwitching}
+              >
+                {isSwitching ? <Loader2 className="h-5 w-5 animate-spin" /> : <SkipForward className="h-5 w-5" />}
+              </RoundBtn>
+              <span className="text-[10px] text-white/90 drop-shadow">Skip</span>
+
+              <RoundBtn
+                intent="primary"
+                onClick={nextStranger}
+                title="Next"
+                disabled={busy || isSwitching}
+              >
+                <Play className="h-5 w-5" />
+              </RoundBtn>
+              <span className="text-[10px] text-white/90 drop-shadow">Next</span>
+            </>
+          )}
+
+          <RoundBtn
+            onClick={() => toggleVideo(!videoEnabled)}
+            title={videoEnabled ? "Turn camera off" : "Turn camera on"}
+          >
+            {videoEnabled ? <Camera className="h-5 w-5" /> : <CameraOff className="h-5 w-5" />}
+          </RoundBtn>
+          <span className="text-[10px] text-white/90 drop-shadow">{videoEnabled ? "Cam On" : "Cam Off"}</span>
+
+          <RoundBtn
+            onClick={() => toggleAudio(!audioEnabled)}
+            title={audioEnabled ? "Mute mic" : "Unmute mic"}
+          >
+            {audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+          </RoundBtn>
+          <span className="text-[10px] text-white/90 drop-shadow">{audioEnabled ? "Mic On" : "Muted"}</span>
+        </div>
+
+        {/* Bottom bar (minimal) */}
+        <div className="absolute left-0 right-0 bottom-0 z-20">
+          <div className="mx-auto mb-3 w-[92%] md:w-[88%] rounded-2xl ring-1 ring-white/60 backdrop-blur shadow-lg px-3 py-2"
+            style={{ background: `linear-gradient(180deg, ${ACCENT.surface} 0%, ${ACCENT.surfaceHover} 100%)` }}
+          >
+            <div className="flex items-center justify-between text-xs sm:text-sm text-gray-800">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-gray-900">Channel:</span>
+                <span>{joinedChannel || channel}</span>
+                <span className="text-gray-300">•</span>
+                <span className="font-semibold text-gray-900">UID:</span>
+                <span>{uid}</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <RoundBtn onClick={() => switchToFacing("user")} title="Front camera">
+                  <RefreshCw className="h-4 w-4" />
+                </RoundBtn>
+                <RoundBtn onClick={() => switchToFacing("environment")} title="Back camera">
+                  <RefreshCw className="h-4 w-4" />
+                </RoundBtn>
+                <RoundBtn intent="danger" onClick={leave} title="Leave">
+                  <Square className="h-4 w-4" />
+                </RoundBtn>
+              </div>
+            </div>
+          </div>
+
+          {getNextStranger && (
+            <p className="pb-2 text-center text-[11px] text-gray-700">
               Tip: Press <b>S</b> or <b>Shift + N</b> to skip instantly.
             </p>
           )}
