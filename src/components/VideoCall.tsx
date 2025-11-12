@@ -18,7 +18,6 @@ import {
   Play,
   Square,
   User,
-  Users,
   Loader2,
   Wifi,
   SkipForward,
@@ -87,6 +86,7 @@ export default function VideoCall({
     </span>
   );
 
+  // All buttons are DARK styled now
   const RoundBtn = ({
     onClick,
     title,
@@ -100,15 +100,14 @@ export default function VideoCall({
     disabled?: boolean;
     children: React.ReactNode;
   }) => {
-    const base = "grid place-items-center rounded-full w-12 h-12 md:w-14 md:h-14 shadow-lg transition-all focus:outline-none disabled:opacity-50 disabled:pointer-events-none";
-    const style =
-      intent === "primary"
-        ? { background: `linear-gradient(135deg, ${ACCENT.primary}, ${ACCENT.primaryDark})`, color: "#fff", boxShadow: "0 8px 22px rgba(108,92,231,0.35)" }
-        : intent === "danger"
-        ? { background: `linear-gradient(135deg, ${ACCENT.danger}, #b91c1c)`, color: "#fff", boxShadow: "0 8px 22px rgba(239,68,68,0.35)" }
-        : { background: "rgba(255,255,255,0.85)" };
+    const base =
+      "grid place-items-center rounded-full w-12 h-12 md:w-14 md:h-14 shadow-lg transition-all focus:outline-none disabled:opacity-50 disabled:pointer-events-none ring-1";
+    const styleClass =
+      intent === "danger"
+        ? "bg-[#2a0c0c] ring-red-900/40 text-white hover:bg-[#3a1212]"
+        : "bg-[#111] ring-white/10 text-white hover:bg-[#1b1b1b]";
     return (
-      <button type="button" title={title} onClick={onClick} disabled={disabled} className={base} style={style}>
+      <button type="button" title={title} onClick={onClick} disabled={disabled} className={`${base} ${styleClass}`}>
         {children}
       </button>
     );
@@ -269,6 +268,12 @@ export default function VideoCall({
     [client, guessDeviceForFacing, localVideoTrack, playLocalInto, refreshDevices]
   );
 
+  // NEW: single flip button handler (toggles front/back)
+  const toggleFacing = useCallback(async () => {
+    const next = facing === "user" ? "environment" : "user";
+    await switchToFacing(next);
+  }, [facing, switchToFacing]);
+
   // ---------- Next/Skip ----------
   const nextStranger = useCallback(async () => {
     if (!getNextStranger) {
@@ -342,7 +347,7 @@ export default function VideoCall({
 
   const statusTone = joinedChannel ? "bg-green-600/80" : "bg-black/60";
 
-  // ---------- RENDER (Reels-style) ----------
+  // ---------- RENDER ----------
   return (
     <div className="w-full grid place-items-center">
       <div
@@ -356,7 +361,7 @@ export default function VideoCall({
           shadow-[0_20px_60px_-20px_rgba(108,92,231,0.35)]
         "
       >
-        {/* Top bar (Reels-like) */}
+        {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 sm:px-4 py-2">
           <div className="flex items-center gap-2">
             <Pill bg={statusTone}>
@@ -390,14 +395,8 @@ export default function VideoCall({
           </div>
         </div>
 
-        {/* Stage: ALWAYS half/half */}
-        <div
-          className="
-            absolute inset-0
-            grid
-            grid-rows-2 md:grid-rows-1 md:grid-cols-2
-          "
-        >
+        {/* Stage */}
+        <div className="absolute inset-0 grid grid-rows-2 md:grid-rows-1 md:grid-cols-2">
           {/* Stranger */}
           <div className="relative">
             <div className="absolute inset-0 bg-black/95 ring-1 ring-white/10" />
@@ -436,12 +435,11 @@ export default function VideoCall({
           </div>
         </div>
 
-        {/* Right overlay stack (Reels-style actions) */}
+        {/* Right overlay actions */}
         <div className="absolute right-3 sm:right-4 bottom-28 md:bottom-8 z-30 flex flex-col items-center gap-3">
           {getNextStranger && (
             <>
               <RoundBtn
-                intent="primary"
                 onClick={skipStranger}
                 title="Skip (S or Shift+N)"
                 disabled={busy || isSwitching}
@@ -451,7 +449,6 @@ export default function VideoCall({
               <span className="text-[10px] text-white/90 drop-shadow">Skip</span>
 
               <RoundBtn
-                intent="primary"
                 onClick={nextStranger}
                 title="Next"
                 disabled={busy || isSwitching}
@@ -479,27 +476,26 @@ export default function VideoCall({
           <span className="text-[10px] text-white/90 drop-shadow">{audioEnabled ? "Mic On" : "Muted"}</span>
         </div>
 
-        {/* Bottom bar (minimal) */}
+        {/* Bottom bar */}
         <div className="absolute left-0 right-0 bottom-0 z-20">
-          <div className="mx-auto mb-3 w-[92%] md:w-[88%] rounded-2xl ring-1 ring-white/60 backdrop-blur shadow-lg px-3 py-2"
-            style={{ background: `linear-gradient(180deg, ${ACCENT.surface} 0%, ${ACCENT.surfaceHover} 100%)` }}
+          <div
+            className="mx-auto mb-3 w-[92%] md:w-[88%] rounded-2xl ring-1 ring-white/10 backdrop-blur shadow-lg px-3 py-2 bg-[#0f0f10]/85"
           >
-            <div className="flex items-center justify-between text-xs sm:text-sm text-gray-800">
+            <div className="flex items-center justify-between text-xs sm:text-sm text-gray-200">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-gray-900">Channel:</span>
+                <span className="font-semibold text-white">Channel:</span>
                 <span>{joinedChannel || channel}</span>
-                <span className="text-gray-300">•</span>
-                <span className="font-semibold text-gray-900">UID:</span>
+                <span className="text-white/20">•</span>
+                <span className="font-semibold text-white">UID:</span>
                 <span>{uid}</span>
               </div>
 
               <div className="flex items-center gap-2">
-                <RoundBtn onClick={() => switchToFacing("user")} title="Front camera">
+                {/* SINGLE flip camera button */}
+                <RoundBtn onClick={toggleFacing} title="Flip camera (Front/Back)">
                   <RefreshCw className="h-4 w-4" />
                 </RoundBtn>
-                <RoundBtn onClick={() => switchToFacing("environment")} title="Back camera">
-                  <RefreshCw className="h-4 w-4" />
-                </RoundBtn>
+
                 <RoundBtn intent="danger" onClick={leave} title="Leave">
                   <Square className="h-4 w-4" />
                 </RoundBtn>
@@ -508,7 +504,7 @@ export default function VideoCall({
           </div>
 
           {getNextStranger && (
-            <p className="pb-2 text-center text-[11px] text-gray-700">
+            <p className="pb-2 text-center text-[11px] text-gray-300">
               Tip: Press <b>S</b> or <b>Shift + N</b> to skip instantly.
             </p>
           )}
