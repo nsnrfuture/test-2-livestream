@@ -17,6 +17,19 @@ import type {
 import { AGORA_APP_ID, randomUid } from "@/lib/agora";
 import type { GiftEvent } from "@/types/live";
 
+// ✅ Lucide icons
+import {
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  PhoneOff,
+  Radio,
+  Copy as CopyIcon,
+  Eye,
+  Link2,
+} from "lucide-react";
+
 /* ------------------------------------
    GiftRain (inline component)
 ------------------------------------ */
@@ -53,7 +66,12 @@ function GiftRain({ feed }: { feed: GiftEvent[] }) {
     return () => clearTimeout(timer);
   }, [feed]);
 
-  return <div ref={boxRef} className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl" />;
+  return (
+    <div
+      ref={boxRef}
+      className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl"
+    />
+  );
 }
 
 function giftEmoji(type: string) {
@@ -167,6 +185,16 @@ function LivePublisher({ channel, onLeave }: LivePublisherProps) {
     }
   }, [client, mic, cam, onLeave]);
 
+  useEffect(() => {
+    return () => {
+      // cleanup on unmount
+      if (joined) {
+        void leave();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joined]);
+
   const toggleMic = async () => {
     if (!mic) return;
     await mic.setEnabled(muted);
@@ -181,49 +209,110 @@ function LivePublisher({ channel, onLeave }: LivePublisherProps) {
 
   return (
     <div className="w-full">
+      {/* Video area */}
       <div
         ref={containerRef}
-        className="aspect-video w-full rounded-2xl bg-linear-to-br from-neutral-900 to-black overflow-hidden shadow-2xl border border-white/10"
-      />
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        {!joined ? (
-          <button
-            onClick={join}
-            disabled={loading || !client}
-            className="px-6 py-3 rounded-xl bg-linear-to-r from-[#6C5CE7] to-[#5b4ed2] text-white font-medium disabled:opacity-60 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-[#6C5CE7]/30 transition-all duration-200 hover:scale-105 active:scale-95"
-          >
-            {loading ? "Starting…" : "🎥 Go Live"}
-          </button>
-        ) : (
-          <>
-            <button
-              onClick={toggleMic}
-              className="px-4 py-3 rounded-xl bg-neutral-800/80 backdrop-blur-sm text-white font-medium hover:bg-neutral-700 transition-all duration-200 border border-white/10 hover:border-white/20 flex items-center gap-2"
-            >
-              <span>{muted ? "🔇" : "🎤"}</span>
-              <span className="hidden sm:inline">{muted ? "Unmute" : "Mute"}</span>
-            </button>
-            <button
-              onClick={toggleVideo}
-              className="px-4 py-3 rounded-xl bg-neutral-800/80 backdrop-blur-sm text-white font-medium hover:bg-neutral-700 transition-all duration-200 border border-white/10 hover:border-white/20 flex items-center gap-2"
-            >
-              <span>{videoOff ? "📹" : "📷"}</span>
-              <span className="hidden sm:inline">{videoOff ? "Camera On" : "Camera Off"}</span>
-            </button>
-            <button
-              onClick={leave}
-              className="px-6 py-3 rounded-xl bg-linear-to-r from-red-500 to-red-600 text-white font-medium hover:shadow-lg hover:shadow-red-500/30 transition-all duration-200 hover:scale-105 active:scale-95"
-            >
-              ⏹️ End Live
-            </button>
-          </>
+        className="aspect-video w-full rounded-2xl bg-neutral-900 overflow-hidden shadow-2xl border border-white/10 relative"
+      >
+        {!joined && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/60">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 border border-white/10 shadow-lg">
+              <Radio className="h-7 w-7" />
+            </div>
+            <p className="text-sm font-medium">You&apos;re offline</p>
+            <p className="text-xs text-white/40 max-w-xs text-center px-4">
+              Start your live to preview camera and audio here.
+            </p>
+          </div>
         )}
       </div>
-      {token ? (
-        <p className="mt-3 text-xs text-white/40 font-mono bg-white/5 rounded-lg px-3 py-2 inline-block">
-          UID: {uid}
-        </p>
-      ) : null}
+
+      {/* Controls */}
+      <div className="mt-5 rounded-2xl bg-neutral-900/70 backdrop-blur-md border border-white/10 px-4 py-3 sm:px-5 sm:py-4">
+        {!joined ? (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold uppercase tracking-wide text-white/40">
+                Live status
+              </span>
+              <span className="text-sm font-medium text-white">
+                Not live yet
+              </span>
+            </div>
+            <button
+              onClick={join}
+              disabled={loading || !client}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#6C5CE7] to-[#5b4ed2] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#6C5CE7]/30 transition-all duration-200 hover:from-[#5b4ed2] hover:to-[#4a3eb8] hover:shadow-[#6C5CE7]/40 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <>
+                  <Radio className="h-4 w-4 animate-pulse" />
+                  <span>Starting live…</span>
+                </>
+              ) : (
+                <>
+                  <Radio className="h-4 w-4" />
+                  <span>Go Live</span>
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Mic */}
+            <button
+              onClick={toggleMic}
+              className="inline-flex flex-1 min-w-[110px] items-center justify-center gap-2 rounded-xl bg-neutral-800/80 px-4 py-2.5 text-xs sm:text-sm font-medium text-white border border-white/10 hover:border-white/30 hover:bg-neutral-700 transition-all"
+            >
+              {muted ? (
+                <>
+                  <MicOff className="h-4 w-4" />
+                  <span>Unmute</span>
+                </>
+              ) : (
+                <>
+                  <Mic className="h-4 w-4" />
+                  <span>Mute</span>
+                </>
+              )}
+            </button>
+
+            {/* Video */}
+            <button
+              onClick={toggleVideo}
+              className="inline-flex flex-1 min-w-[110px] items-center justify-center gap-2 rounded-xl bg-neutral-800/80 px-4 py-2.5 text-xs sm:text-sm font-medium text-white border border-white/10 hover:border-white/30 hover:bg-neutral-700 transition-all"
+            >
+              {videoOff ? (
+                <>
+                  <Video className="h-4 w-4" />
+                  <span>Camera On</span>
+                </>
+              ) : (
+                <>
+                  <VideoOff className="h-4 w-4" />
+                  <span>Camera Off</span>
+                </>
+              )}
+            </button>
+
+            {/* End live */}
+            <button
+              onClick={leave}
+              className="inline-flex flex-[1.2] min-w-[130px] items-center justify-center gap-2 rounded-xl bg-linear-to-r from-red-500 to-red-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-red-500/30 hover:shadow-red-500/40 hover:scale-[1.02] active:scale-95 transition-all"
+            >
+              <PhoneOff className="h-4 w-4" />
+              <span>End Live</span>
+            </button>
+          </div>
+        )}
+
+        {token ? (
+          <p className="mt-3 text-[10px] sm:text-xs text-white/40 font-mono bg-white/5 rounded-lg px-3 py-2 inline-flex items-center gap-2">
+            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            UID: {uid}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -271,41 +360,43 @@ export default function GoOnlinePage() {
 
   return (
     <main className="min-h-screen w-full bg-linear-to-b from-neutral-950 via-neutral-900 to-neutral-950 text-white pt-20 pb-12 px-4">
-      <section className="mx-auto max-w-5xl">
+      <section className="mx-auto max-w-5xl space-y-6 sm:space-y-8">
         {/* Header */}
-        <div className="text-center sm:text-left mb-8 sm:mb-10">
-          <h1 className="text-4xl sm:text-5xl font-bold bg-linear-to-r from-white to-white/70 bg-clip-text text-transparent">
+        <div className="text-center sm:text-left">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-linear-to-r from-white to-white/70 bg-clip-text text-transparent">
             Go Live
           </h1>
-          <p className="text-white/60 mt-3 text-base sm:text-lg max-w-2xl">
-            Share your talent. Earn from gifts sent by viewers in real-time.
+          <p className="text-white/60 mt-3 text-sm sm:text-base md:text-lg max-w-2xl mx-auto sm:mx-0">
+            Start a live room, share the link, and earn from gifts sent by
+            viewers in real-time.
           </p>
         </div>
 
         {!channel ? (
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-white/10 shadow-2xl">
-            <label className="block text-sm font-medium text-white/80 mb-3">
-              Stream Title (Optional)
-            </label>
-            <div className="flex flex-col sm:flex-row gap-3">
+          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-5 sm:p-7 border border-white/10 shadow-2xl space-y-4">
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-white/80 mb-2">
+                Stream Title (Optional)
+              </label>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Give your stream a catchy title..."
-                className="flex-1 rounded-xl bg-neutral-800/50 backdrop-blur-sm px-5 py-3.5 outline-none border border-white/10 focus:border-[#6C5CE7] focus:ring-2 focus:ring-[#6C5CE7]/20 transition-all duration-200 placeholder:text-white/40"
+                className="w-full rounded-xl bg-neutral-900/80 backdrop-blur-sm px-4 py-3 text-sm outline-none border border-white/10 focus:border-[#6C5CE7] focus:ring-2 focus:ring-[#6C5CE7]/25 transition-all placeholder:text-white/35"
               />
-              <button
-                onClick={startLive}
-                className="px-8 py-3.5 rounded-xl bg-linear-to-r from-[#6C5CE7] to-[#5b4ed2] hover:from-[#5b4ed2] hover:to-[#4a3eb8] font-medium shadow-lg shadow-[#6C5CE7]/20 hover:shadow-xl hover:shadow-[#6C5CE7]/30 transition-all duration-200 hover:scale-105 active:scale-95 whitespace-nowrap"
-              >
-                🚀 Start Live
-              </button>
             </div>
+            <button
+              onClick={startLive}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#6C5CE7] to-[#5b4ed2] px-6 py-3 text-sm sm:text-base font-semibold text-white shadow-lg shadow-[#6C5CE7]/25 hover:shadow-[#6C5CE7]/40 hover:scale-[1.02] active:scale-95 transition-all"
+            >
+              <Radio className="h-4 w-4" />
+              <span>Start Live Session</span>
+            </button>
           </div>
         ) : (
           <div className="space-y-6">
             {/* Video Container */}
-            <div className="relative bg-white/5 backdrop-blur-sm rounded-2xl p-4 sm:p-6 border border-white/10 shadow-2xl">
+            <div className="relative bg-white/5 backdrop-blur-sm rounded-2xl p-3 sm:p-4 border border-white/10 shadow-2xl">
               <div className="relative">
                 <LivePublisher channel={channel} onLeave={endLive} />
                 <GiftRain feed={feed} />
@@ -313,26 +404,33 @@ export default function GoOnlinePage() {
             </div>
 
             {/* Share Section */}
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-5 sm:p-6 border border-white/10 shadow-xl">
-              <h3 className="text-sm font-semibold text-white/90 mb-4 flex items-center gap-2">
-                <span>🔗</span> Share Your Stream
+            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-5 sm:p-6 border border-white/10 shadow-xl space-y-4">
+              <h3 className="text-sm font-semibold text-white/90 flex items-center gap-2">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/5 border border-white/10">
+                  <Link2 className="h-4 w-4" />
+                </span>
+                <span>Share Your Stream</span>
               </h3>
-              
+
               <div className="flex flex-col gap-3">
-                <div className="bg-neutral-800/50 rounded-xl px-4 py-3 border border-white/10 break-all text-sm">
-                  <span className="text-white/50 text-xs font-medium block mb-1">Live URL:</span>
-                  <span className="text-white/90 font-mono">{shareUrl}</span>
+                <div className="bg-neutral-900/70 rounded-xl px-4 py-3 border border-white/10 break-all text-xs sm:text-sm">
+                  <span className="text-white/45 text-[11px] font-semibold uppercase tracking-wide block mb-1">
+                    Live URL
+                  </span>
+                  <span className="text-white/90 font-mono">
+                    {shareUrl || "Live link will appear here"}
+                  </span>
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={() => {
                       if (!shareUrl) return;
                       navigator.clipboard.writeText(shareUrl);
                     }}
-                    className="flex-1 px-5 py-3 rounded-xl bg-neutral-800/80 backdrop-blur-sm hover:bg-neutral-700 font-medium transition-all duration-200 border border-white/10 hover:border-white/20 flex items-center justify-center gap-2"
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900/80 px-4 py-3 text-sm font-medium text-white border border-white/10 hover:border-white/25 hover:bg-neutral-800 transition-all"
                   >
-                    <span>📋</span>
+                    <CopyIcon className="h-4 w-4" />
                     <span>Copy Link</span>
                   </button>
                   <button
@@ -340,16 +438,17 @@ export default function GoOnlinePage() {
                       if (!channel) return;
                       router.push(`/live/${channel}`);
                     }}
-                    className="flex-1 px-5 py-3 rounded-xl bg-white text-black font-medium hover:bg-white/90 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-black px-4 py-3 text-sm font-semibold shadow-lg hover:bg-white/95 hover:shadow-xl transition-all hover:scale-[1.02] active:scale-95"
                   >
-                    <span>👁️</span>
+                    <Eye className="h-4 w-4" />
                     <span>Open Viewer Page</span>
                   </button>
                 </div>
               </div>
 
-              <p className="text-xs text-white/40 mt-4 bg-white/5 rounded-lg px-3 py-2 border border-white/5">
-                💡 Tip: Viewers can send gifts on the viewer page; they'll float here instantly.
+              <p className="text-[11px] sm:text-xs text-white/45 mt-1 bg-white/5 rounded-lg px-3 py-2 border border-white/5">
+                Viewers can send gifts from the viewer page. They&apos;ll rain
+                over your video here instantly.
               </p>
             </div>
           </div>
