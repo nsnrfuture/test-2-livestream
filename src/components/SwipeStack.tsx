@@ -16,11 +16,15 @@ export default function SwipeStack({ onSwipeUp }: { onSwipeUp: () => void }) {
 
   const handleDragEnd = (_: any, info: PanInfo) => {
     dragging.current = false;
+
     if (info.offset.y < -120) {
       // Swiped up
       onSwipeUp();
-      // “Remove” the top card
-      setCards((prev) => prev.slice(1));
+
+      // ⏳ 6 second delay before next card
+      setTimeout(() => {
+        setCards((prev) => prev.slice(1));
+      }, 6000);
     }
   };
 

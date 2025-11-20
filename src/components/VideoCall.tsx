@@ -1,6 +1,9 @@
 "use client";
+
 import { useEffect, useRef, useState, useCallback } from "react";
-import AgoraRTC, {
+
+// 👉 Type-only import is safe for SSR
+import type {
   IAgoraRTCClient,
   ICameraVideoTrack,
   IMicrophoneAudioTrack,
@@ -8,6 +11,7 @@ import AgoraRTC, {
   IRemoteAudioTrack,
   ILocalVideoTrack,
 } from "agora-rtc-sdk-ng";
+
 import { AGORA_APP_ID } from "@/lib/agora";
 import {
   Camera,
@@ -26,7 +30,7 @@ import {
 
 type Props = {
   channel: string;
-  uid: number;
+  uid?: number;
   getToken: (channel: string, uid: number) => Promise<string>;
   getNextStranger?: () => Promise<{ channel: string; uid?: number }>;
   onLeave?: () => void;
@@ -34,13 +38,11 @@ type Props = {
 
 type Facing = "user" | "environment";
 
-const ACCENT = {
-  primary: "#6C5CE7",
-  primaryDark: "#5b4ed2",
-  danger: "#EF4444",
-  surface: "rgba(255,255,255,0.75)",
-  surfaceHover: "rgba(255,255,255,0.9)",
-};
+let AgoraRTC: any | null = null;
+
+function randomAgoraUid() {
+  return Math.floor(Math.random() * 2147483647) + 1;
+}
 
 export default function VideoCall({
   channel,
@@ -52,11 +54,8 @@ export default function VideoCall({
   const containerRef = useRef<HTMLDivElement>(null);
   const remoteRef = useRef<HTMLDivElement>(null);
 
-  const [client] = useState<IAgoraRTCClient>(() =>
-    AgoraRTC.createClient({ mode: "rtc", codec: "vp8" })
-  );
-
-  const [uid, setUid] = useState<number>(initialUid);
+  const [client, setClient] = useState<IAgoraRTCClient | null>(null);
+  const [uid, setUid] = useState<number>(initialUid ?? randomAgoraUid());
   const [joinedChannel, setJoinedChannel] = useState<string | null>(null);
 
   const [localVideoTrack, setLocalVideoTrack] = useState<ICameraVideoTrack | null>(null);
@@ -65,15 +64,39 @@ export default function VideoCall({
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [busy, setBusy] = useState(false);
 
-  // UI states
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [facing, setFacing] = useState<Facing>("user");
 
-  // Guard for rapid skip
   const [isSwitching, setIsSwitching] = useState(false);
 
-  // ---------- UI atoms ----------
+  const joinStateRef = useRef<"idle" | "joining" | "joined">("idle");
+
+  const [matchCountdown, setMatchCountdown] = useState<number | null>(null);
+  const pendingNextRef = useRef(false);
+
+  // ---------- Load Agora SDK + create client ----------
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      if (!AgoraRTC && typeof window !== "undefined") {
+        const mod = await import("agora-rtc-sdk-ng");
+        AgoraRTC = mod.default ?? mod;
+        console.log("[Agora] SDK loaded");
+      }
+      if (mounted && AgoraRTC && !client) {
+        const c = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+        setClient(c);
+        console.log("[Agora] client created");
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [client]);
+
   const Pill = ({
     children,
     bg = "bg-black/60",
@@ -81,12 +104,13 @@ export default function VideoCall({
     children: React.ReactNode;
     bg?: string;
   }) => (
-    <span className={`inline-flex items-center gap-1 rounded-full ${bg} text-white text-xs font-medium px-2 py-1 backdrop-blur`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full ${bg} text-white text-xs font-medium px-2 py-1 backdrop-blur`}
+    >
       {children}
     </span>
   );
 
-  // All buttons are DARK styled now
   const RoundBtn = ({
     onClick,
     title,
@@ -107,13 +131,18 @@ export default function VideoCall({
         ? "bg-[#2a0c0c] ring-red-900/40 text-white hover:bg-[#3a1212]"
         : "bg-[#111] ring-white/10 text-white hover:bg-[#1b1b1b]";
     return (
-      <button type="button" title={title} onClick={onClick} disabled={disabled} className={`${base} ${styleClass}`}>
+      <button
+        type="button"
+        title={title}
+        onClick={onClick}
+        disabled={disabled}
+        className={`${base} ${styleClass}`}
+      >
         {children}
       </button>
     );
   };
 
-  // ---------- Core helpers ----------
   const playLocalInto = useCallback((track: ILocalVideoTrack) => {
     if (!containerRef.current) return;
     const el = document.createElement("div");
@@ -125,6 +154,7 @@ export default function VideoCall({
   }, []);
 
   const attachRemoteHandlers = useCallback(() => {
+    if (!client) return;
     client.removeAllListeners();
 
     client.on("user-published", async (user, mediaType) => {
@@ -152,6 +182,7 @@ export default function VideoCall({
   }, [client]);
 
   const refreshDevices = useCallback(async () => {
+    if (!AgoraRTC) return [];
     const devs = await AgoraRTC.getCameras();
     setCameras(devs);
     return devs;
@@ -159,6 +190,7 @@ export default function VideoCall({
 
   const createLocalTracks = useCallback(
     async (opts?: { cameraId?: string; facingMode?: Facing }) => {
+      if (!AgoraRTC) throw new Error("Agora SDK not loaded");
       const mic = await AgoraRTC.createMicrophoneAudioTrack();
       const cam = await AgoraRTC.createCameraVideoTrack(
         opts?.cameraId
@@ -188,19 +220,54 @@ export default function VideoCall({
   }, [localVideoTrack, localAudioTrack]);
 
   const joinChannel = useCallback(
-    async (ch: string, u: number, initialFacing: Facing = "user") => {
+    async (ch: string, u: number, initialFacing: Facing = "user", retryOnUidConflict = true) => {
+      if (!client || !AgoraRTC) {
+        console.warn("[Agora] client/SDK not ready yet");
+        return;
+      }
+
+      if (joinStateRef.current === "joining" || joinStateRef.current === "joined") {
+        console.log("[Agora] joinChannel skipped – already", joinStateRef.current);
+        return;
+      }
+
       setBusy(true);
+      joinStateRef.current = "joining";
+
       try {
+        console.log("[Agora] joining", ch, "uid=", u);
         const token = await getToken(ch, u);
         await client.join(AGORA_APP_ID, ch, token, u);
 
         const { mic, cam } = await createLocalTracks({ facingMode: initialFacing });
         await client.publish([mic, cam]);
+
         attachRemoteHandlers();
         setJoinedChannel(ch);
         setFacing(initialFacing);
         setVideoEnabled(true);
         setAudioEnabled(true);
+        joinStateRef.current = "joined";
+        console.log("[Agora] joined", ch, "as", u);
+      } catch (err: any) {
+        console.error("[Agora] joinChannel error:", err);
+
+        const msg = String(err?.message || err);
+        const code = (err && (err.code || err.name)) as string | undefined;
+
+        if (
+          retryOnUidConflict &&
+          (code === "UID_CONFLICT" || msg.includes("UID_CONFLICT"))
+        ) {
+          const newUid = randomAgoraUid();
+          console.warn("[Agora] UID_CONFLICT, retrying with new uid:", newUid);
+          joinStateRef.current = "idle";
+          setUid(newUid);
+          return joinChannel(ch, newUid, initialFacing, false);
+        }
+
+        joinStateRef.current = "idle";
+        throw err;
       } finally {
         setBusy(false);
       }
@@ -209,24 +276,39 @@ export default function VideoCall({
   );
 
   const leaveChannel = useCallback(async () => {
+    if (joinStateRef.current === "idle" || !client) {
+      return;
+    }
+
     setBusy(true);
     try {
-      await client.unpublish().catch(() => {});
+      try {
+        await client.unpublish();
+      } catch {}
+
       await destroyLocalTracks();
-      await client.leave().catch(() => {});
+
+      try {
+        await client.leave();
+      } catch {}
+
       remoteRef.current?.replaceChildren();
       setJoinedChannel(null);
+      joinStateRef.current = "idle";
+      console.log("[Agora] left channel");
     } finally {
       setBusy(false);
     }
   }, [client, destroyLocalTracks]);
 
-  // ---------- Facing ----------
   const guessDeviceForFacing = useCallback(
     (want: Facing) => {
       const needles =
         want === "user" ? ["front", "user", "facing front"] : ["back", "rear", "environment"];
-      const lowered = cameras.map((d) => ({ ...d, _label: (d.label || "").toLowerCase() }));
+      const lowered = cameras.map((d) => ({
+        ...d,
+        _label: (d.label || "").toLowerCase(),
+      }));
       const hit = lowered.find(
         (d) => d.kind === "videoinput" && needles.some((n) => d._label.includes(n))
       );
@@ -237,7 +319,7 @@ export default function VideoCall({
 
   const switchToFacing = useCallback(
     async (want: Facing) => {
-      if (!localVideoTrack) return;
+      if (!localVideoTrack || !client) return;
       setBusy(true);
       try {
         const devId = guessDeviceForFacing(want);
@@ -252,9 +334,11 @@ export default function VideoCall({
         try {
           await client.unpublish(localVideoTrack);
         } catch {}
+
         localVideoTrack.stop();
         localVideoTrack.close();
 
+        if (!AgoraRTC) return;
         const newCam = await AgoraRTC.createCameraVideoTrack({ facingMode: want });
         await client.publish(newCam);
         setLocalVideoTrack(newCam);
@@ -268,37 +352,67 @@ export default function VideoCall({
     [client, guessDeviceForFacing, localVideoTrack, playLocalInto, refreshDevices]
   );
 
-  // NEW: single flip button handler (toggles front/back)
   const toggleFacing = useCallback(async () => {
     const next = facing === "user" ? "environment" : "user";
     await switchToFacing(next);
   }, [facing, switchToFacing]);
 
-  // ---------- Next/Skip ----------
-  const nextStranger = useCallback(async () => {
-    if (!getNextStranger) {
+  const nextStranger = useCallback(
+    async () => {
+      if (!getNextStranger) {
+        await leaveChannel();
+        onLeave?.();
+        return;
+      }
+
       await leaveChannel();
-      onLeave?.();
+
+      const { channel: newChannel, uid: maybeUid } = await getNextStranger();
+
+      const nextUid = typeof maybeUid === "number" ? maybeUid : randomAgoraUid();
+      setUid(nextUid);
+
+      await joinChannel(newChannel, nextUid, facing);
+    },
+    [getNextStranger, joinChannel, leaveChannel, onLeave, facing]
+  );
+
+  const queueNextMatch = useCallback(() => {
+    if (!getNextStranger) return;
+    if (matchCountdown !== null || pendingNextRef.current) return;
+    pendingNextRef.current = true;
+    setIsSwitching(true);
+    setMatchCountdown(6);
+  }, [getNextStranger, matchCountdown]);
+
+  const skipStranger = useCallback(() => {
+    if (!getNextStranger || busy || isSwitching || matchCountdown !== null) return;
+    queueNextMatch();
+  }, [getNextStranger, busy, isSwitching, matchCountdown, queueNextMatch]);
+
+  useEffect(() => {
+    if (matchCountdown === null) return;
+
+    if (matchCountdown === 0) {
+      setMatchCountdown(null);
+      (async () => {
+        try {
+          await nextStranger();
+        } finally {
+          pendingNextRef.current = false;
+          setIsSwitching(false);
+        }
+      })();
       return;
     }
-    await leaveChannel();
-    const { channel: newChannel, uid: maybeUid } = await getNextStranger();
-    const nextUid = typeof maybeUid === "number" ? maybeUid : uid;
-    setUid(nextUid);
-    await joinChannel(newChannel, nextUid, facing);
-  }, [getNextStranger, joinChannel, leaveChannel, onLeave, uid, facing]);
 
-  const skipStranger = useCallback(async () => {
-    if (!getNextStranger || isSwitching || busy) return;
-    setIsSwitching(true);
-    try {
-      await nextStranger();
-    } finally {
-      setIsSwitching(false);
-    }
-  }, [getNextStranger, isSwitching, busy, nextStranger]);
+    const id = setTimeout(() => {
+      setMatchCountdown((c) => (c === null ? null : c - 1));
+    }, 1000);
 
-  // Shortcuts: S or Shift+N
+    return () => clearTimeout(id);
+  }, [matchCountdown, nextStranger]);
+
   useEffect(() => {
     if (!getNextStranger) return;
     const onKey = (e: KeyboardEvent) => {
@@ -312,28 +426,42 @@ export default function VideoCall({
     return () => window.removeEventListener("keydown", onKey);
   }, [getNextStranger, skipStranger]);
 
-  // ---------- Init ----------
   useEffect(() => {
+    if (!client) return;
     let cancelled = false;
+
     (async () => {
-      await joinChannel(channel, uid, "user");
-      if (!cancelled) await refreshDevices();
+      try {
+        await joinChannel(channel, uid, "user");
+        if (!cancelled) {
+          await refreshDevices();
+        }
+      } catch (err) {
+        console.error("[Agora] initial join error:", err);
+      }
     })();
+
     return () => {
       cancelled = true;
       (async () => {
-        await leaveChannel().catch(() => {});
+        try {
+          await leaveChannel();
+        } catch (err) {
+          console.warn("[Agora] leave on unmount error:", err);
+        } finally {
+          client.removeAllListeners?.();
+        }
       })();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [client]);
 
-  // ---------- Toggles ----------
   const toggleVideo = async (enable: boolean) => {
     if (!localVideoTrack) return;
     await localVideoTrack.setEnabled(enable);
     setVideoEnabled(enable);
   };
+  
   const toggleAudio = async (enable: boolean) => {
     if (!localAudioTrack) return;
     await localAudioTrack.setEnabled(enable);
@@ -347,7 +475,6 @@ export default function VideoCall({
 
   const statusTone = joinedChannel ? "bg-green-600/80" : "bg-black/60";
 
-  // ---------- RENDER ----------
   return (
     <div className="w-full grid place-items-center">
       <div
@@ -361,8 +488,15 @@ export default function VideoCall({
           shadow-[0_20px_60px_-20px_rgba(108,92,231,0.35)]
         "
       >
-        {/* Top bar */}
+        {/* Top bar - Status pills moved to top right */}
         <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 sm:px-4 py-2">
+          <div className="flex items-center gap-2">
+            <Pill>
+              <User className="h-3.5 w-3.5" />
+              Stranger
+            </Pill>
+          </div>
+
           <div className="flex items-center gap-2">
             <Pill bg={statusTone}>
               <Dot className="h-4 w-4" />
@@ -371,25 +505,30 @@ export default function VideoCall({
             {!audioEnabled && (
               <Pill bg="bg-yellow-600/80">
                 <MicOff className="h-3.5 w-3.5" />
-                Muted
+                <span className="hidden sm:inline">Muted</span>
               </Pill>
             )}
             {!videoEnabled && (
               <Pill bg="bg-red-600/80">
                 <CameraOff className="h-3.5 w-3.5" />
-                Cam Off
+                <span className="hidden sm:inline">Cam Off</span>
               </Pill>
             )}
           </div>
+        </div>
 
-          <div className="hidden md:flex items-center gap-2 text-xs text-gray-700">
+        {/* RTC Status - Bottom of top bar */}
+        <div className="absolute top-12 right-3 sm:right-4 z-20">
+          <div className="hidden md:flex items-center gap-2 text-xs text-gray-200 bg-black/40 backdrop-blur rounded-full px-3 py-1.5">
             <Wifi className="h-4 w-4 opacity-80" />
             <span>RTC</span>
-            {(busy || isSwitching) && (
+            {(busy || isSwitching || matchCountdown !== null) && (
               <>
-                <span className="mx-1 text-gray-300">•</span>
+                <span className="mx-1 text-gray-400">•</span>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>{isSwitching ? "Matching…" : "Working…"}</span>
+                <span className="font-semibold">
+                  {matchCountdown !== null ? `Next in ${matchCountdown}s` : "Working…"}
+                </span>
               </>
             )}
           </div>
@@ -401,11 +540,12 @@ export default function VideoCall({
           <div className="relative">
             <div className="absolute inset-0 bg-black/95 ring-1 ring-white/10" />
             <div ref={remoteRef} className="absolute inset-0" />
-            <div className="absolute left-3 top-3 z-10">
-              <Pill>
-                <User className="h-3.5 w-3.5" />
-                Stranger
-              </Pill>
+            
+            {/* tego.live watermark - Bigger size */}
+            <div className="pointer-events-none absolute bottom-8 inset-x-0 flex justify-center">
+              <span className="text-2xl md:text-2xl font-bold tracking-[0.35em] uppercase text-white/95 drop-shadow-2xl">
+                TEGO.LIVE
+              </span>
             </div>
             <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-black/20" />
             <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5" />
@@ -430,6 +570,13 @@ export default function VideoCall({
                 </div>
               </div>
             )}
+            
+            {/* tego.live watermark - Bigger size */}
+            <div className="pointer-events-none absolute bottom-8 inset-x-0 flex justify-center">
+              <span className="text-2xl md:text-2xl font-bold tracking-[0.35em] uppercase text-white/95 drop-shadow-2xl">
+                TEGO.LIVE
+              </span>
+            </div>
             <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-black/20" />
             <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5" />
           </div>
@@ -442,20 +589,32 @@ export default function VideoCall({
               <RoundBtn
                 onClick={skipStranger}
                 title="Skip (S or Shift+N)"
-                disabled={busy || isSwitching}
+                disabled={busy || isSwitching || matchCountdown !== null}
               >
-                {isSwitching ? <Loader2 className="h-5 w-5 animate-spin" /> : <SkipForward className="h-5 w-5" />}
+                {isSwitching && matchCountdown !== null ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <SkipForward className="h-5 w-5" />
+                )}
               </RoundBtn>
               <span className="text-[10px] text-white/90 drop-shadow">Skip</span>
 
               <RoundBtn
-                onClick={nextStranger}
+                onClick={queueNextMatch}
                 title="Next"
-                disabled={busy || isSwitching}
+                disabled={busy || isSwitching || matchCountdown !== null}
               >
                 <Play className="h-5 w-5" />
               </RoundBtn>
-              <span className="text-[10px] text-white/90 drop-shadow">Next</span>
+              <span className="text-[10px] text-white/90 drop-shadow">
+                {matchCountdown !== null ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-white/20 bg-white/10">
+                    Next in <span className="ml-1 font-semibold">{matchCountdown}s</span>
+                  </span>
+                ) : (
+                  "Next"
+                )}
+              </span>
             </>
           )}
 
@@ -465,7 +624,9 @@ export default function VideoCall({
           >
             {videoEnabled ? <Camera className="h-5 w-5" /> : <CameraOff className="h-5 w-5" />}
           </RoundBtn>
-          <span className="text-[10px] text-white/90 drop-shadow">{videoEnabled ? "Cam On" : "Cam Off"}</span>
+          <span className="text-[10px] text-white/90 drop-shadow">
+            {videoEnabled ? "Cam On" : "Cam Off"}
+          </span>
 
           <RoundBtn
             onClick={() => toggleAudio(!audioEnabled)}
@@ -473,42 +634,39 @@ export default function VideoCall({
           >
             {audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
           </RoundBtn>
-          <span className="text-[10px] text-white/90 drop-shadow">{audioEnabled ? "Mic On" : "Muted"}</span>
+          <span className="text-[10px] text-white/90 drop-shadow">
+            {audioEnabled ? "Mic On" : "Muted"}
+          </span>
         </div>
 
-        {/* Bottom bar */}
-        <div className="absolute left-0 right-0 bottom-0 z-20">
-          <div
-            className="mx-auto mb-3 w-[92%] md:w-[88%] rounded-2xl ring-1 ring-white/10 backdrop-blur shadow-lg px-3 py-2 bg-[#0f0f10]/85"
-          >
-            <div className="flex items-center justify-between text-xs sm:text-sm text-gray-200">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-white">Channel:</span>
-                <span>{joinedChannel || channel}</span>
-                <span className="text-white/20">•</span>
-                <span className="font-semibold text-white">UID:</span>
-                <span>{uid}</span>
-              </div>
+        {/* Bottom center controls */}
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-4 z-20 flex items-center gap-3">
+          <RoundBtn onClick={toggleFacing} title="Flip camera (Front/Back)">
+            <RefreshCw className="h-4 w-4" />
+          </RoundBtn>
 
-              <div className="flex items-center gap-2">
-                {/* SINGLE flip camera button */}
-                <RoundBtn onClick={toggleFacing} title="Flip camera (Front/Back)">
-                  <RefreshCw className="h-4 w-4" />
-                </RoundBtn>
+          <RoundBtn intent="danger" onClick={leave} title="Leave">
+            <Square className="h-4 w-4" />
+          </RoundBtn>
+        </div>
 
-                <RoundBtn intent="danger" onClick={leave} title="Leave">
-                  <Square className="h-4 w-4" />
-                </RoundBtn>
-              </div>
+        {/* Bottom left info */}
+        <div className="absolute left-3 sm:left-4 bottom-4 z-20">
+          <div className="flex items-center gap-2 text-[11px] text-white/80 bg-black/40 backdrop-blur rounded-full px-3 py-1.5 ring-1 ring-white/10">
+            <span className="font-medium">{joinedChannel || channel}</span>
+            <span className="text-white/30">•</span>
+            <span>#{uid}</span>
+          </div>
+        </div>
+
+        {/* Keyboard shortcut hint */}
+        {getNextStranger && (
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-20 z-20">
+            <div className="text-[10px] text-white/70 bg-black/30 backdrop-blur rounded-full px-3 py-1 ring-1 ring-white/10">
+              Press <span className="font-bold text-white">S</span> or <span className="font-bold text-white">Shift+N</span> to skip
             </div>
           </div>
-
-          {getNextStranger && (
-            <p className="pb-2 text-center text-[11px] text-gray-300">
-              Tip: Press <b>S</b> or <b>Shift + N</b> to skip instantly.
-            </p>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
