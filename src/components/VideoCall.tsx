@@ -461,7 +461,7 @@ export default function VideoCall({
     await localVideoTrack.setEnabled(enable);
     setVideoEnabled(enable);
   };
-  
+
   const toggleAudio = async (enable: boolean) => {
     if (!localAudioTrack) return;
     await localAudioTrack.setEnabled(enable);
@@ -540,13 +540,8 @@ export default function VideoCall({
           <div className="relative">
             <div className="absolute inset-0 bg-black/95 ring-1 ring-white/10" />
             <div ref={remoteRef} className="absolute inset-0" />
-            
-            {/* tego.live watermark - Bigger size */}
-            <div className="pointer-events-none absolute bottom-8 inset-x-0 flex justify-center">
-              <span className="text-2xl md:text-2xl font-bold tracking-[0.35em] uppercase text-white/95 drop-shadow-2xl">
-                TEGO.LIVE
-              </span>
-            </div>
+
+            {/* Gradient + border overlays only */}
             <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-black/20" />
             <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5" />
           </div>
@@ -570,13 +565,8 @@ export default function VideoCall({
                 </div>
               </div>
             )}
-            
-            {/* tego.live watermark - Bigger size */}
-            <div className="pointer-events-none absolute bottom-8 inset-x-0 flex justify-center">
-              <span className="text-2xl md:text-2xl font-bold tracking-[0.35em] uppercase text-white/95 drop-shadow-2xl">
-                TEGO.LIVE
-              </span>
-            </div>
+
+            {/* Gradient + border overlays only */}
             <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-black/20" />
             <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5" />
           </div>
@@ -663,7 +653,8 @@ export default function VideoCall({
         {getNextStranger && (
           <div className="absolute left-1/2 -translate-x-1/2 bottom-20 z-20">
             <div className="text-[10px] text-white/70 bg-black/30 backdrop-blur rounded-full px-3 py-1 ring-1 ring-white/10">
-              Press <span className="font-bold text-white">S</span> or <span className="font-bold text-white">Shift+N</span> to skip
+              Press <span className="font-bold text-white">S</span> or{" "}
+              <span className="font-bold text-white">Shift+N</span> to skip
             </div>
           </div>
         )}
