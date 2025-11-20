@@ -490,13 +490,24 @@ export default function VideoCall({
       >
         {/* Top bar - Status pills moved to top right */}
         <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 sm:px-4 py-2">
-          <div className="flex items-center gap-2">
+          {/* LEFT: Stranger + (mobile) room info */}
+          <div className="flex flex-col items-start gap-1">
             <Pill>
               <User className="h-3.5 w-3.5" />
               Stranger
             </Pill>
+
+            {/* Mobile-only room id + uid so bottom pe clutter na ho */}
+            <div className="md:hidden">
+              <Pill bg="bg-black/70">
+                <span className="text-[10px]">{joinedChannel || channel}</span>
+                <span className="text-white/30 mx-1">•</span>
+                <span className="text-[10px]">#{uid}</span>
+              </Pill>
+            </div>
           </div>
 
+          {/* RIGHT: status */}
           <div className="flex items-center gap-2">
             <Pill bg={statusTone}>
               <Dot className="h-4 w-4" />
@@ -517,7 +528,7 @@ export default function VideoCall({
           </div>
         </div>
 
-        {/* RTC Status - Bottom of top bar */}
+        {/* RTC Status - Bottom of top bar (desktop only) */}
         <div className="absolute top-12 right-3 sm:right-4 z-20">
           <div className="hidden md:flex items-center gap-2 text-xs text-gray-200 bg-black/40 backdrop-blur rounded-full px-3 py-1.5">
             <Wifi className="h-4 w-4 opacity-80" />
@@ -640,8 +651,8 @@ export default function VideoCall({
           </RoundBtn>
         </div>
 
-        {/* Bottom left info */}
-        <div className="absolute left-3 sm:left-4 bottom-4 z-20">
+        {/* Bottom left info (desktop only, taaki mobile pe beech me na aaye) */}
+        <div className="absolute left-3 sm:left-4 bottom-4 z-20 hidden md:block">
           <div className="flex items-center gap-2 text-[11px] text-white/80 bg-black/40 backdrop-blur rounded-full px-3 py-1.5 ring-1 ring-white/10">
             <span className="font-medium">{joinedChannel || channel}</span>
             <span className="text-white/30">•</span>
@@ -649,9 +660,9 @@ export default function VideoCall({
           </div>
         </div>
 
-        {/* Keyboard shortcut hint */}
+        {/* Keyboard shortcut hint (desktop only) */}
         {getNextStranger && (
-          <div className="absolute left-1/2 -translate-x-1/2 bottom-20 z-20">
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-20 z-20 hidden md:block">
             <div className="text-[10px] text-white/70 bg-black/30 backdrop-blur rounded-full px-3 py-1 ring-1 ring-white/10">
               Press <span className="font-bold text-white">S</span> or{" "}
               <span className="font-bold text-white">Shift+N</span> to skip
