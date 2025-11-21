@@ -35,8 +35,8 @@ export default function TegoHeader() {
             Video Chat
             <span className="absolute left-0 -bottom-2 h-[3px] w-full rounded-full bg-white" />
           </Link>
-          <Link href="/blog" className="text-white/60 hover:text-white transition">
-            Blog
+          <Link href="/pricing" className="text-white/60 hover:text-white transition">
+            Pricing
           </Link>
           <Link href="/about" className="text-white/60 hover:text-white transition">
             About
@@ -86,11 +86,11 @@ export default function TegoHeader() {
             </Link>
 
             <Link
-              href="/blog"
+              href="/pricing"
               onClick={() => setOpen(false)}
               className="py-2 px-3 rounded-lg hover:bg-white/10 transition"
             >
-              Blog
+              Pricing
             </Link>
 
             <Link
