@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+import TegoHeader from "@/components/common/TegoHeader";
+import TegoFooter from "@/components/common/TegoFooter";
+
 // ---- Fonts ----
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -91,9 +94,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#111] text-white`}
       >
-        {children}
+        <TegoHeader />
+        <main className="min-h-screen">{children}</main>
+        <TegoFooter />
       </body>
     </html>
   );

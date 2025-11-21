@@ -1,162 +1,126 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ACCENT, Status } from "@/components/ACCENT";
-import GradientScene from "@/components/layout/GradientScene";
-import StatusPill from "@/components/layout/StatusPill";
-import SwipePanel from "@/components/home/SwipePanel";
-import ActionSection from "@/components/home/ActionSection";
-import FooterStrip from "@/components/home/FooterStrip";
+import { Maximize2, Sparkles, Smile, ChevronDown } from "lucide-react";
 
-async function preflightPermissions() {
-  if (!navigator?.mediaDevices?.getUserMedia) return;
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-    stream.getTracks().forEach((t) => t.stop());
-  } catch {}
-}
+const people = [
+  { id: 1, name: "David", age: 29, country: "🇺🇸", src: "/avatars/a1.jpg" },
+  { id: 2, name: "Ngoc Anh", age: 23, country: "🇻🇳", src: "/avatars/a2.jpg" },
+  { id: 3, name: "Jisu", age: 23, country: "🇰🇷", src: "/avatars/a3.jpg" },
+  { id: 4, name: "Joshua", age: 25, country: "🇺🇸", src: "/avatars/a4.jpg" },
+  { id: 5, name: "Sara", age: 24, country: "🇫🇷", src: "/avatars/a5.jpg" },
+  { id: 6, name: "Mia", age: 22, country: "🇧🇷", src: "/avatars/a6.jpg" },
+];
 
 export default function HomePage() {
   const router = useRouter();
-  const [status, setStatus] = useState<Status>("idle");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const uid = useMemo(() => Math.floor(Math.random() * 10_000_000), []);
-  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isMounted = useRef(true);
-
-  const clearPoll = () => {
-    if (pollTimer.current) {
-      clearTimeout(pollTimer.current);
-      pollTimer.current = null;
-    }
-  };
-
-  const cancelWaiting = useCallback(async () => {
-    clearPoll();
-    setStatus("idle");
-    try {
-      await fetch("/api/match/leave", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ uid }),
-      }).catch(() => {});
-    } catch {}
-  }, [uid]);
-
-  const pollOnce = useCallback(async () => {
-    try {
-      const again = await fetch("/api/match", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ uid }),
-      });
-
-      const result = await again.json().catch(() => ({}));
-      if (result.status === "paired" && result.channel) {
-        clearPoll();
-        if (!isMounted.current) return;
-        setStatus("paired");
-        router.push(`/call/${result.channel}?uid=${uid}`);
-        return;
-      }
-
-      if (status === "waiting" && isMounted.current) {
-        const delay = 2500 + Math.floor(Math.random() * 1000);
-        pollTimer.current = setTimeout(pollOnce, delay);
-      }
-    } catch (e: any) {
-      if (!isMounted.current) return;
-      setStatus("error");
-      setErrorMsg(e?.message || "Something went wrong while pairing.");
-    }
-  }, [router, status, uid]);
-
-  const tryPair = useCallback(async () => {
-    clearPoll();
-    setErrorMsg(null);
-    setStatus("pairing");
-    try {
-      const res = await fetch("/api/match", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ uid }),
-      });
-      const data = await res.json();
-
-      if (data.status === "paired" && data.channel) {
-        setStatus("paired");
-        router.push(`/call/${data.channel}?uid=${uid}`);
-        return;
-      }
-
-      if (data.status === "waiting") {
-        setStatus("waiting");
-        pollTimer.current = setTimeout(pollOnce, 1000);
-        return;
-      }
-
-      setStatus("error");
-      setErrorMsg(data?.error || "Unable to pair right now.");
-    } catch (e: any) {
-      setStatus("error");
-      setErrorMsg(e?.message || "Network error. Please try again.");
-    }
-  }, [pollOnce, router, uid]);
-
-  useEffect(() => {
-    preflightPermissions();
-    return () => {
-      isMounted.current = false;
-      clearPoll();
-    };
-  }, []);
 
   return (
-    <GradientScene>
-      <section className="relative mx-auto flex min-h-screen max-w-6xl items-center justify-center px-4 py-20">
-        <div className="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_8px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl md:p-10">
-          {/* animated glow ring */}
-          <div
-            className="pointer-events-none absolute -inset-1 rounded-[28px] opacity-60 animate-rotateGlow"
-            style={{
-              background: `conic-gradient(from 0deg, transparent, ${ACCENT.primary}, ${ACCENT.secondary}, ${ACCENT.primary}, transparent)`,
-            }}
-          />
-          <div className="pointer-events-none absolute -inset-1 rounded-[28px] bg-black/20" />
+    <main className="min-h-screen bg-[#111] text-white">
+      {/* MAIN WRAPPER */}
+      <section className="px-4 py-4 md:px-8 md:py-6">
+        <div className="mx-auto max-w-6xl grid gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
 
-          {/* header */}
-          <div className="relative z-10 flex flex-col items-center gap-6 text-center md:flex-row md:items-start md:justify-between md:text-left">
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                <p className="text-xs tracking-[0.2em] text-white/60">LIVE CONNECTION READY</p>
+          {/* LEFT PANEL */}
+          <div className="relative bg-black rounded-4xl overflow-hidden border border-white/10 min-h-[420px] md:min-h-[520px]">
+
+            {/* Camera Preview Placeholder */}
+            <div className="absolute inset-0">
+              <div className="h-full w-full bg-neutral-900 flex items-center justify-center">
+                <span className="text-sm text-white/40">Local camera preview</span>
               </div>
-              <h1 className="mt-4 bg-linear-to-br from-white to-white/80 bg-clip-text text-4xl font-bold leading-tight text-transparent md:text-5xl">
-                Discover Meaningful Conversations with Strangers Worldwide
-              </h1>
-              <p className="mt-4 max-w-xl text-lg text-white/70 leading-relaxed">
-                Experience the thrill of spontaneous connection. Our intelligent matching pairs you with
-                like-minded individuals for authentic, one-on-one video conversations. No filters, no followers—just real human moments.
-              </p>
             </div>
-            <StatusPill status={status} />
+
+            {/* Top-left Button */}
+            <div className="absolute left-4 top-4 flex flex-col gap-3">
+              <button className="h-9 w-9 rounded-full bg-black/60 border border-white/20 flex items-center justify-center hover:bg-black/80 transition">
+                <Maximize2 className="h-4 w-4 text-white" />
+              </button>
+            </div>
+
+            {/* Left-middle fun controls */}
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-3">
+              <button className="h-10 w-10 rounded-full bg-black/60 border border-white/20 flex items-center justify-center hover:bg-black/80 transition">
+                <Sparkles className="h-4 w-4 text-pink-300" />
+              </button>
+              <button className="h-10 w-10 rounded-full bg-black/60 border border-white/20 flex items-center justify-center hover:bg-black/80 transition">
+                <Smile className="h-4 w-4 text-amber-300" />
+              </button>
+            </div>
+
+            {/* Bottom Filters + Start */}
+            <div className="absolute bottom-5 left-0 right-0 flex flex-col items-center gap-3 px-4">
+
+              {/* Filters */}
+              <div className="flex w-full justify-center gap-3 max-w-xl">
+                <button className="flex items-center gap-2 rounded-full bg-black/80 px-4 py-2 text-sm font-medium border border-white/20 shadow">
+                  <span className="text-lg">⚧</span>
+                  <span>Gender</span>
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+
+                <button className="flex items-center gap-2 rounded-full bg-black/80 px-4 py-2 text-sm font-medium border border-white/20 shadow">
+                  <span className="text-lg">🌎</span>
+                  <span>Country</span>
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Start Button */}
+              <button
+                className="flex items-center justify-center gap-3 rounded-full bg-white px-8 py-3 text-black font-semibold text-sm shadow-lg"
+                onClick={() => router.push("/find-strangers")}
+              >
+                <div className="-ml-3 flex">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={i}
+                      className="h-7 w-7 rounded-full border-2 border-white -ml-2 bg-linear-to-tr from-purple-500 to-emerald-400"
+                    />
+                  ))}
+                </div>
+                <span>Start Video Chat</span>
+              </button>
+            </div>
           </div>
 
-          {/* content */}
-          <div className="mt-12 grid items-center gap-12 md:grid-cols-[1.1fr_.9fr]">
-            <SwipePanel onSwipeUp={tryPair} />
-            <ActionSection
-              status={status}
-              errorMsg={errorMsg}
-              onTryPair={tryPair}
-              onCancel={cancelWaiting}
-            />
+          {/* RIGHT PANEL – PEOPLE GRID */}
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-3 h-full">
+            {people.map((p) => (
+              <div
+                key={p.id}
+                className="relative rounded-3xl overflow-hidden bg-neutral-900 border border-white/10 flex flex-col justify-end min-h-[180px]"
+              >
+                {/* Online Badge */}
+                <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-black/70 px-2 py-1">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[10px] uppercase tracking-[0.16em] text-emerald-300">
+                    Online
+                  </span>
+                </div>
+
+                {/* Avatar Image */}
+                <Image
+                  src={p.src}
+                  alt={p.name}
+                  fill
+                  className="object-cover opacity-90"
+                />
+
+                {/* Details */}
+                <div className="relative z-10 bg-linear-to-t from-black/80 via-black/40 to-transparent pt-12 px-3 pb-3">
+                  <div className="text-sm font-semibold">
+                    <span className="mr-1">{p.country}</span>
+                    {p.name}, {p.age}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
-          <FooterStrip />
         </div>
       </section>
-    </GradientScene>
+    </main>
   );
 }
