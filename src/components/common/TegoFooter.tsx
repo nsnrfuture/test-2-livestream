@@ -6,7 +6,7 @@ export default function TegoFooter() {
       <div className="mt-3 flex justify-center gap-6 text-xs">
         <a href="/privacy-policy
         " className="hover:text-white transition">Privacy Policy</a>
-        <a href="/terms-and-conditions" className="hover:text-white transition">Terms of Service</a>
+        <a href="/terms-and-conditions" className="hover:text-white transition">Terms of Conditions</a>
         <a href="/contact" className="hover:text-white transition">Contact</a>
       </div>
     </footer>

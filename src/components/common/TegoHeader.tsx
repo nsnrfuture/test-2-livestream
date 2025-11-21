@@ -23,7 +23,7 @@ export default function TegoHeader() {
               className="h-8 w-8 sm:h-9 sm:w-9 object-contain"
             />
             <span className="font-semibold text-lg sm:text-xl tracking-tight text-white">
-              Tego
+              Tego Live
             </span>
           </Link>
 
