@@ -1,19 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { Clock3, User2, Menu, X } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
 export default function TegoHeader() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname(); // ⭐ Detect current URL
+
+  const isActive = (path: string) => pathname === path;
 
   return (
     <header className="w-full bg-[#111] border-b border-white/10 px-4 sm:px-6 md:px-10 py-3 sm:py-4">
+      
       {/* TOP ROW */}
       <div className="flex items-center justify-between gap-4">
         
-        {/* Left - Logo */}
+        {/* Logo */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2">
             <Image
@@ -29,23 +34,56 @@ export default function TegoHeader() {
           </Link>
         </div>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
-          <Link href="/" className="text-white hover:text-white/80 transition relative">
+        {/* DESKTOP NAV */}
+        <nav className="hidden md:flex items-center gap-8 text-sm font-medium relative">
+          
+          {/* VIDEO CHAT */}
+          <Link
+            href="/"
+            className={`relative transition ${
+              isActive("/") ? "text-white" : "text-white/60 hover:text-white/80"
+            }`}
+          >
             Video Chat
-            <span className="absolute left-0 -bottom-2 h-[3px] w-full rounded-full bg-white" />
+            {isActive("/") && (
+              <span className="absolute left-0 -bottom-2 h-[3px] w-full rounded-full bg-white transition-all" />
+            )}
           </Link>
-          <Link href="/pricing" className="text-white/60 hover:text-white transition">
+
+          {/* PRICING */}
+          <Link
+            href="/pricing"
+            className={`relative transition ${
+              isActive("/pricing")
+                ? "text-white"
+                : "text-white/60 hover:text-white"
+            }`}
+          >
             Pricing
+            {isActive("/pricing") && (
+              <span className="absolute left-0 -bottom-2 h-[3px] w-full rounded-full bg-white transition-all" />
+            )}
           </Link>
-          <Link href="/about" className="text-white/60 hover:text-white transition">
+
+          {/* ABOUT */}
+          <Link
+            href="/about"
+            className={`relative transition ${
+              isActive("/about")
+                ? "text-white"
+                : "text-white/60 hover:text-white"
+            }`}
+          >
             About
+            {isActive("/about") && (
+              <span className="absolute left-0 -bottom-2 h-[3px] w-full rounded-full bg-white transition-all" />
+            )}
           </Link>
         </nav>
 
-        {/* RIGHT SIDE BUTTONS */}
+        {/* RIGHT SIDE CTA */}
         <div className="flex items-center gap-3">
-          {/* Go Online (primary CTA) */}
+          
           <Link
             href="/go-online"
             className="hidden sm:inline-flex items-center justify-center rounded-full bg-emerald-400 px-4 py-2 text-sm font-semibold text-black shadow hover:bg-emerald-300 transition"
@@ -58,45 +96,50 @@ export default function TegoHeader() {
             <User2 className="h-5 w-5 text-white/80" />
           </button>
 
-          {/* MOBILE HAMBURGER MENU BUTTON */}
+          {/* MOBILE MENU BUTTON */}
           <button
             onClick={() => setOpen(!open)}
             className="md:hidden flex items-center justify-center h-10 w-10 rounded-full bg-white/10 border border-white/20"
           >
-            {open ? (
-              <X className="h-6 w-6 text-white" />
-            ) : (
-              <Menu className="h-6 w-6 text-white" />
-            )}
+            {open ? <X className="h-6 w-6 text-white" /> : <Menu className="h-6 w-6 text-white" />}
           </button>
         </div>
       </div>
 
-      {/* MOBILE DROPDOWN MENU */}
+      {/* MOBILE DROPDOWN */}
       {open && (
         <div className="md:hidden mt-4 pb-4 border-t border-white/10 animate-slideDown">
           <nav className="flex flex-col gap-4 mt-4 text-sm text-white/80 px-2">
-            
+
+            {/* VIDEO CHAT */}
             <Link
               href="/"
               onClick={() => setOpen(false)}
-              className="text-white font-semibold py-2 px-3 rounded-lg bg-white/10"
+              className={`py-2 px-3 rounded-lg ${
+                isActive("/") ? "bg-white/10 text-white font-semibold" : "hover:bg-white/10"
+              }`}
             >
               Video Chat
             </Link>
 
+            {/* PRICING */}
             <Link
               href="/pricing"
               onClick={() => setOpen(false)}
-              className="py-2 px-3 rounded-lg hover:bg-white/10 transition"
+              className={`py-2 px-3 rounded-lg ${
+                isActive("/pricing") ? "bg-white/10 text-white font-semibold" : "hover:bg-white/10"
+              }`}
             >
               Pricing
             </Link>
 
+            {/* ABOUT */}
             <Link
               href="/about"
               onClick={() => setOpen(false)}
-              className="py-2 px-3 rounded-lg hover:bg-white/10 transition"
+              className={`py-2 px-3 rounded-lg ${
+                isActive("/about") ? "bg-white/10 text-white font-semibold" : "hover:bg-white/10"
+              }`}
             >
               About
             </Link>
@@ -124,12 +167,11 @@ export default function TegoHeader() {
               <User2 className="h-4 w-4" />
               Profile
             </button>
-
           </nav>
         </div>
       )}
 
-      {/* Animation CSS */}
+      {/* Animation */}
       <style jsx>{`
         .animate-slideDown {
           animation: slideDown 0.3s ease forwards;
