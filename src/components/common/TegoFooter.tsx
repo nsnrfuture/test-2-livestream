@@ -8,6 +8,7 @@ export default function TegoFooter() {
         " className="hover:text-white transition">Privacy Policy</a>
         <a href="/terms-and-conditions" className="hover:text-white transition">Terms of Conditions</a>
         <a href="/contact" className="hover:text-white transition">Contact</a>
+        <a href="/cancellations-and-refunds" className="hover:text-white transition">Cancellations and Refunds</a>
       </div>
     </footer>
   );
