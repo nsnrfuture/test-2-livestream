@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { Maximize2, Sparkles, Smile, ChevronDown } from "lucide-react";
 
 const people = [
@@ -15,22 +16,44 @@ const people = [
 
 export default function HomePage() {
   const router = useRouter();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // ⭐ Enable Camera
+  useEffect(() => {
+    async function enableCam() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false,
+        });
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.error("Camera error:", err);
+      }
+    }
+
+    enableCam();
+  }, []);
 
   return (
     <main className="min-h-screen bg-[#111] text-white">
-      {/* MAIN WRAPPER */}
       <section className="px-4 py-4 md:px-8 md:py-6">
         <div className="mx-auto max-w-6xl grid gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
 
           {/* LEFT PANEL */}
           <div className="relative bg-black rounded-4xl overflow-hidden border border-white/10 min-h-[420px] md:min-h-[520px]">
 
-            {/* Camera Preview Placeholder */}
-            <div className="absolute inset-0">
-              <div className="h-full w-full bg-neutral-900 flex items-center justify-center">
-                <span className="text-sm text-white/40">Local camera preview</span>
-              </div>
-            </div>
+            {/* ⭐ Live Camera Preview */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 h-full w-full object-cover"
+            />
 
             {/* Top-left Button */}
             <div className="absolute left-4 top-4 flex flex-col gap-3">
@@ -100,7 +123,6 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                {/* Avatar Image */}
                 <Image
                   src={p.src}
                   alt={p.name}
@@ -108,7 +130,6 @@ export default function HomePage() {
                   className="object-cover opacity-90"
                 />
 
-                {/* Details */}
                 <div className="relative z-10 bg-linear-to-t from-black/80 via-black/40 to-transparent pt-12 px-3 pb-3">
                   <div className="text-sm font-semibold">
                     <span className="mr-1">{p.country}</span>
