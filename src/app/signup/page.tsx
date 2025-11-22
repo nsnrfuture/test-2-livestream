@@ -7,9 +7,14 @@ import { supabase } from "@/lib/supabaseClient";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function SignupPage() {
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,8 +24,19 @@ export default function SignupPage() {
     setError(null);
     setMessage(null);
 
-    if (!email || !password) {
-      setError("Please enter both email and password.");
+    // Basic validations
+    if (!fullName || !email || !password || !confirmPassword) {
+      setError("Please fill all fields.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
       return;
     }
 
@@ -29,6 +45,11 @@ export default function SignupPage() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName, // 👈 store extra info in user metadata
+          },
+        },
       });
 
       if (error) {
@@ -37,6 +58,11 @@ export default function SignupPage() {
         setMessage(
           "Signup successful! If email confirmation is enabled, please check your inbox."
         );
+        // Optionally clear form
+        // setFullName("");
+        // setEmail("");
+        // setPassword("");
+        // setConfirmPassword("");
       }
     } catch (err: any) {
       setError(err?.message || "Something went wrong.");
@@ -60,6 +86,21 @@ export default function SignupPage() {
 
         {/* Form */}
         <form onSubmit={handleSignup} className="space-y-4">
+          {/* Full Name */}
+          <div className="space-y-1">
+            <label className="block text-sm text-neutral-300">
+              Full name
+            </label>
+            <input
+              type="text"
+              autoComplete="name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="John Doe"
+            />
+          </div>
+
           {/* Email */}
           <div className="space-y-1">
             <label className="block text-sm text-neutral-300">Email</label>
@@ -91,6 +132,36 @@ export default function SignupPage() {
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Confirm Password */}
+          <div className="space-y-1">
+            <label className="block text-sm text-neutral-300">
+              Confirm password
+            </label>
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 pr-10 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setShowConfirmPassword((prev) => !prev)
+                }
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+              >
+                {showConfirmPassword ? (
+                  <EyeOff size={18} />
+                ) : (
+                  <Eye size={18} />
+                )}
               </button>
             </div>
             <p className="text-[11px] text-neutral-500 mt-1">

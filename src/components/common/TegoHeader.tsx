@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Clock3, User2, Menu, X } from "lucide-react";
 import Link from "next/link";
@@ -10,6 +10,9 @@ import { supabase } from "@/lib/supabase"; // 👈 adjust if your path is differ
 type SupaUser = {
   id: string;
   email?: string;
+  user_metadata?: {
+    full_name?: string | null;
+  };
 };
 
 export default function TegoHeader() {
@@ -21,6 +24,14 @@ export default function TegoHeader() {
   const router = useRouter();
 
   const isActive = (path: string) => pathname === path;
+
+  // 👇 Decide what to show as display name
+  const displayName = useMemo(() => {
+    const name = user?.user_metadata?.full_name?.trim();
+    if (name) return name;
+    if (user?.email) return user.email;
+    return "Profile";
+  }, [user]);
 
   /* ---------------- Auth listener (Supabase) ---------------- */
   useEffect(() => {
@@ -58,10 +69,10 @@ export default function TegoHeader() {
   /* ---------------- Logout handler ---------------- */
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut(); // ✅ session end
+      await supabase.auth.signOut();
       setUser(null);
       setOpen(false);
-      router.push("/"); // back to home
+      router.push("/");
     } catch (err) {
       console.error("Logout error", err);
     }
@@ -147,19 +158,21 @@ export default function TegoHeader() {
             </Link>
           )}
 
-          {/* If still loading auth, keep old UI / simple placeholder */}
+          {/* If still loading auth */}
           {authLoading ? (
             <div className="hidden sm:flex h-10 min-w-20 items-center justify-center rounded-full bg-white/5 text-xs text-white/40">
               Checking...
             </div>
           ) : user ? (
-            /* LOGGED IN: show profile + logout */
+            /* LOGGED IN: show name/email + logout */
             <>
-              <button className="hidden sm:flex items-center justify-center h-10 rounded-full bg-white/10 border border-white/20 px-3 text-xs text-white/80 max-w-[140px] truncate">
+              <button
+                type="button"
+                onClick={() => router.push("/profile")} // 👈 click -> profile
+                className="hidden sm:flex items-center justify-center h-10 rounded-full bg-white/10 border border-white/20 px-3 text-xs text-white/80 max-w-40 truncate"
+              >
                 <User2 className="h-4 w-4 mr-1.5" />
-                <span className="truncate">
-                  {user.email ?? "Profile"}
-                </span>
+                <span className="truncate">{displayName}</span>
               </button>
               <button
                 onClick={handleLogout}
@@ -172,13 +185,13 @@ export default function TegoHeader() {
             /* LOGGED OUT: show Sign in / Sign up */
             <>
               <Link
-                href="/login" // 👈 change route if different
+                href="/auth/login"
                 className="hidden sm:inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-xs font-semibold text-black shadow hover:bg-white/90 transition"
               >
                 Sign in
               </Link>
               <Link
-                href="/signup" // 👈 change route if different
+                href="/auth/signup"
                 className="hidden sm:inline-flex items-center justify-center rounded-full border border-white/30 px-4 py-2 text-xs font-semibold text-white hover:bg-white/10 transition"
               >
                 Sign up
@@ -243,7 +256,7 @@ export default function TegoHeader() {
               About
             </Link>
 
-            {/* If logged in: Go Online, History, Profile, Logout */}
+            {/* If logged in: Go Online, History, Profile (with name/email), Logout */}
             {user ? (
               <>
                 <Link
@@ -263,11 +276,15 @@ export default function TegoHeader() {
                 </button>
 
                 <button
-                  onClick={() => setOpen(false)}
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    router.push("/profile"); // 👈 mobile: profile redirect
+                  }}
                   className="flex items-center gap-2 py-2 px-3 bg-white/10 rounded-lg"
                 >
                   <User2 className="h-4 w-4" />
-                  Profile
+                  <span className="truncate">{displayName}</span>
                 </button>
 
                 <button
