@@ -1,23 +1,76 @@
 "use client";
 
-import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Clock3, User2, Menu, X } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { supabase } from "@/lib/supabase"; // 👈 adjust if your path is different
+
+type SupaUser = {
+  id: string;
+  email?: string;
+};
 
 export default function TegoHeader() {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname(); // ⭐ Detect current URL
+  const [user, setUser] = useState<SupaUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  const pathname = usePathname();
+  const router = useRouter();
 
   const isActive = (path: string) => pathname === path;
 
+  /* ---------------- Auth listener (Supabase) ---------------- */
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadUser() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!cancelled) {
+          setUser(user as SupaUser | null);
+        }
+      } catch (err) {
+        console.error("Error loading user", err);
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
+    }
+
+    loadUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser((session?.user as SupaUser | null) ?? null);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  /* ---------------- Logout handler ---------------- */
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut(); // ✅ session end
+      setUser(null);
+      setOpen(false);
+      router.push("/"); // back to home
+    } catch (err) {
+      console.error("Logout error", err);
+    }
+  };
+
   return (
     <header className="w-full bg-[#111] border-b border-white/10 px-4 sm:px-6 md:px-10 py-3 sm:py-4">
-      
       {/* TOP ROW */}
       <div className="flex items-center justify-between gap-4">
-        
         {/* Logo */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2">
@@ -36,12 +89,13 @@ export default function TegoHeader() {
 
         {/* DESKTOP NAV */}
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium relative">
-          
           {/* VIDEO CHAT */}
           <Link
             href="/"
             className={`relative transition ${
-              isActive("/") ? "text-white" : "text-white/60 hover:text-white/80"
+              isActive("/")
+                ? "text-white"
+                : "text-white/60 hover:text-white/80"
             }`}
           >
             Video Chat
@@ -83,25 +137,65 @@ export default function TegoHeader() {
 
         {/* RIGHT SIDE CTA */}
         <div className="flex items-center gap-3">
-          
-          <Link
-            href="/go-online"
-            className="hidden sm:inline-flex items-center justify-center rounded-full bg-emerald-400 px-4 py-2 text-sm font-semibold text-black shadow hover:bg-emerald-300 transition"
-          >
-            Go Online
-          </Link>
+          {/* Go Online (only show when logged in) */}
+          {user && (
+            <Link
+              href="/go-online"
+              className="hidden sm:inline-flex items-center justify-center rounded-full bg-emerald-400 px-4 py-2 text-sm font-semibold text-black shadow hover:bg-emerald-300 transition"
+            >
+              Go Online
+            </Link>
+          )}
 
-          {/* Profile Icon */}
-          <button className="hidden sm:flex items-center justify-center h-10 w-10 rounded-full bg-white/10 border border-white/20">
-            <User2 className="h-5 w-5 text-white/80" />
-          </button>
+          {/* If still loading auth, keep old UI / simple placeholder */}
+          {authLoading ? (
+            <div className="hidden sm:flex h-10 min-w-20 items-center justify-center rounded-full bg-white/5 text-xs text-white/40">
+              Checking...
+            </div>
+          ) : user ? (
+            /* LOGGED IN: show profile + logout */
+            <>
+              <button className="hidden sm:flex items-center justify-center h-10 rounded-full bg-white/10 border border-white/20 px-3 text-xs text-white/80 max-w-[140px] truncate">
+                <User2 className="h-4 w-4 mr-1.5" />
+                <span className="truncate">
+                  {user.email ?? "Profile"}
+                </span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="hidden sm:inline-flex items-center justify-center rounded-full border border-red-400/60 px-4 py-2 text-xs font-semibold text-red-200 hover:bg-red-500/10 transition"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            /* LOGGED OUT: show Sign in / Sign up */
+            <>
+              <Link
+                href="/login" // 👈 change route if different
+                className="hidden sm:inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-xs font-semibold text-black shadow hover:bg-white/90 transition"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/signup" // 👈 change route if different
+                className="hidden sm:inline-flex items-center justify-center rounded-full border border-white/30 px-4 py-2 text-xs font-semibold text-white hover:bg-white/10 transition"
+              >
+                Sign up
+              </Link>
+            </>
+          )}
 
           {/* MOBILE MENU BUTTON */}
           <button
             onClick={() => setOpen(!open)}
             className="md:hidden flex items-center justify-center h-10 w-10 rounded-full bg-white/10 border border-white/20"
           >
-            {open ? <X className="h-6 w-6 text-white" /> : <Menu className="h-6 w-6 text-white" />}
+            {open ? (
+              <X className="h-6 w-6 text-white" />
+            ) : (
+              <Menu className="h-6 w-6 text-white" />
+            )}
           </button>
         </div>
       </div>
@@ -110,13 +204,14 @@ export default function TegoHeader() {
       {open && (
         <div className="md:hidden mt-4 pb-4 border-t border-white/10 animate-slideDown">
           <nav className="flex flex-col gap-4 mt-4 text-sm text-white/80 px-2">
-
             {/* VIDEO CHAT */}
             <Link
               href="/"
               onClick={() => setOpen(false)}
               className={`py-2 px-3 rounded-lg ${
-                isActive("/") ? "bg-white/10 text-white font-semibold" : "hover:bg-white/10"
+                isActive("/")
+                  ? "bg-white/10 text-white font-semibold"
+                  : "hover:bg-white/10"
               }`}
             >
               Video Chat
@@ -127,7 +222,9 @@ export default function TegoHeader() {
               href="/pricing"
               onClick={() => setOpen(false)}
               className={`py-2 px-3 rounded-lg ${
-                isActive("/pricing") ? "bg-white/10 text-white font-semibold" : "hover:bg-white/10"
+                isActive("/pricing")
+                  ? "bg-white/10 text-white font-semibold"
+                  : "hover:bg-white/10"
               }`}
             >
               Pricing
@@ -138,35 +235,67 @@ export default function TegoHeader() {
               href="/about"
               onClick={() => setOpen(false)}
               className={`py-2 px-3 rounded-lg ${
-                isActive("/about") ? "bg-white/10 text-white font-semibold" : "hover:bg-white/10"
+                isActive("/about")
+                  ? "bg-white/10 text-white font-semibold"
+                  : "hover:bg-white/10"
               }`}
             >
               About
             </Link>
 
-            <Link
-              href="/go-online"
-              onClick={() => setOpen(false)}
-              className="py-2 px-3 rounded-lg bg-emerald-400 text-black font-semibold text-sm text-center"
-            >
-              Go Online
-            </Link>
+            {/* If logged in: Go Online, History, Profile, Logout */}
+            {user ? (
+              <>
+                <Link
+                  href="/go-online"
+                  onClick={() => setOpen(false)}
+                  className="py-2 px-3 rounded-lg bg-emerald-400 text-black font-semibold text-sm text-center"
+                >
+                  Go Online
+                </Link>
 
-            <button
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 py-2 px-3 bg-white/10 rounded-lg"
-            >
-              <Clock3 className="h-4 w-4" />
-              History
-            </button>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 py-2 px-3 bg-white/10 rounded-lg"
+                >
+                  <Clock3 className="h-4 w-4" />
+                  History
+                </button>
 
-            <button
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 py-2 px-3 bg-white/10 rounded-lg"
-            >
-              <User2 className="h-4 w-4" />
-              Profile
-            </button>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 py-2 px-3 bg-white/10 rounded-lg"
+                >
+                  <User2 className="h-4 w-4" />
+                  Profile
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  className="mt-1 py-2 px-3 rounded-lg bg-red-500/80 text-white font-semibold text-sm text-center"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              /* If logged OUT in mobile */
+              <>
+                <Link
+                  href="/auth/login"
+                  onClick={() => setOpen(false)}
+                  className="py-2 px-3 rounded-lg bg-white text-black font-semibold text-sm text-center"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/auth/signup"
+                  onClick={() => setOpen(false)}
+                  className="py-2 px-3 rounded-lg border border-white/30 text-white font-semibold text-sm text-center"
+                >
+                  Sign up
+                </Link>
+              </>
+            )}
           </nav>
         </div>
       )}
