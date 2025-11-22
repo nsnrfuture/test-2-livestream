@@ -1,4 +1,4 @@
-// app/auth/signup/page.tsx
+// app/signup/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -42,21 +42,28 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : undefined;
+
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName, // 👈 store extra info in user metadata
           },
+          // 👇 IMPORTANT: confirm hone ke baad kidhar bhejna hai
+          emailRedirectTo: origin ? `${origin}/login` : undefined,
         },
       });
+
+      console.log("SIGNUP RESULT:", { data, error });
 
       if (error) {
         setError(error.message);
       } else {
         setMessage(
-          "Signup successful! If email confirmation is enabled, please check your inbox."
+          "Signup successful! Please check your email to verify your account."
         );
         // Optionally clear form
         // setFullName("");
@@ -65,6 +72,7 @@ export default function SignupPage() {
         // setConfirmPassword("");
       }
     } catch (err: any) {
+      console.error("SIGNUP CATCH ERROR:", err);
       setError(err?.message || "Something went wrong.");
     } finally {
       setLoading(false);
@@ -195,7 +203,7 @@ export default function SignupPage() {
         <p className="mt-4 text-xs text-neutral-400 text-center">
           Already have an account?{" "}
           <Link
-            href="/login"
+            href="/login" 
             className="text-indigo-400 hover:text-indigo-300 font-medium"
           >
             Login
