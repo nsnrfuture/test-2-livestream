@@ -36,7 +36,7 @@ export default function ForgetPasswordPage() {
         setError(error.message || "Error sending recovery email.");
       } else {
         setMessage(
-          "If this email exists, we’ve sent a password reset link. Please check your inbox."
+          "If this email exists, we’ve sent a password reset link. Please check your inbox/spam box."
         );
       }
     } catch (err: any) {
