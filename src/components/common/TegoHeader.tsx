@@ -188,7 +188,7 @@ export default function TegoHeader() {
                 href="/login"
                 className="hidden sm:inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-xs font-semibold text-black shadow hover:bg-white/90 transition"
               >
-                Sign in
+                Login
               </Link>
               <Link
                 href="/signup"
@@ -302,7 +302,7 @@ export default function TegoHeader() {
                   onClick={() => setOpen(false)}
                   className="py-2 px-3 rounded-lg bg-white text-black font-semibold text-sm text-center"
                 >
-                  Sign in
+                  Login
                 </Link>
                 <Link
                   href="/signup"
