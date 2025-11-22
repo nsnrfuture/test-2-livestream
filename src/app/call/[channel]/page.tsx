@@ -1,10 +1,11 @@
 // app/call/[channel]/page.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Wifi, Users } from "lucide-react";
 import VideoCall from "@/components/VideoCall";
+import { supabase } from "@/lib/supabaseClient";
 
 const ACCENT = {
   primary: "#6C5CE7",
@@ -33,6 +34,23 @@ export default function CallPage() {
   const sp = useSearchParams();
   const router = useRouter();
 
+  // Supabase auth user
+  const [userId, setUserId] = useState<string | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) {
+        console.error("[auth] user not logged in:", error);
+        setUserId(null);
+      } else {
+        setUserId(data.user.id);
+      }
+      setLoadingUser(false);
+    })();
+  }, []);
+
   // Generate or read UID
   const uid = useMemo(() => {
     const raw = sp.get("uid");
@@ -42,8 +60,8 @@ export default function CallPage() {
   // (Optional) show a tiny UI hint while the very first join happens
   const [booted, setBooted] = useState(false);
 
-  // ---- must match the props in your VideoCall ----
-  const getToken = async (ch: string, u: number) => {
+  // ---- must match the props in your VideoCall (NEW VERSION) ----
+  const getToken = useCallback(async (ch: string, u: number) => {
     const res = await fetch("/api/token", {
       method: "POST",
       body: JSON.stringify({ channel: ch, uid: u }),
@@ -54,36 +72,35 @@ export default function CallPage() {
       throw new Error(err?.error || "Failed to get token");
     }
     const data = (await res.json()) as { token: string };
-    // first successful token = booted
     if (!booted) setBooted(true);
     return data.token;
-  };
-
-  // >>> used by Next/Skip buttons <<<
-  const getNextStranger = async () => {
-    const res = await fetch("/api/match", {
-      method: "POST",
-      body: JSON.stringify({ uid }),
-      headers: { "Content-Type": "application/json" },
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error || "Failed to match");
-    }
-    const data = (await res.json()) as
-      | { status: "waiting" }
-      | { status: "paired"; channel: string; partner: number };
-
-    if (data.status === "waiting") {
-      // keep the current channel for now; your component will keep UI alive
-      return { channel, uid };
-    }
-    return { channel: data.channel, uid };
-  };
+  }, [booted]);
 
   const onLeave = () => {
     router.push("/");
   };
+
+  // ---- Auth loading / guard ----
+  if (loadingUser) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-neutral-950 text-white">
+        <div className="text-sm text-white/70">Checking session…</div>
+      </main>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-neutral-950 text-white">
+        <div className="rounded-xl bg-white/5 px-6 py-4 border border-white/10 text-center">
+          <div className="text-lg font-semibold mb-1">Login Required</div>
+          <p className="text-sm text-white/70">
+            Please sign in to use video chat with strangers.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div className="relative min-h-dvh w-full overflow-hidden">
@@ -125,8 +142,8 @@ export default function CallPage() {
               <Users className="h-4 w-4 text-indigo-600" />
               <span className="text-gray-700">2</span>
             </Pill>
-            <Pill title="Channel name">
-              <span className="text-gray-500">Channel:</span>
+            <Pill title="Channel (route param)">
+              <span className="text-gray-500">Route:</span>
               <span className="font-semibold">{String(channel)}</span>
             </Pill>
             <Pill title="Your UID">
@@ -146,10 +163,9 @@ export default function CallPage() {
         >
           <div className="rounded-2xl bg-white/40 p-2 ring-1 ring-white/60">
             <VideoCall
-              channel={String(channel)}
               uid={uid}
               getToken={getToken}
-              getNextStranger={getNextStranger}
+              userId={userId}
               onLeave={onLeave}
             />
           </div>
@@ -160,7 +176,9 @@ export default function CallPage() {
               Tip: Press <b>S</b> or <b>Shift + N</b> to skip to a new stranger.
             </div>
             <div
-              className={`text-xs ${booted ? "text-emerald-600" : "text-gray-500"}`}
+              className={`text-xs ${
+                booted ? "text-emerald-600" : "text-gray-500"
+              }`}
             >
               {booted ? "Connected • Secure RTC" : "Connecting…"}
             </div>

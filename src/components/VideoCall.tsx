@@ -13,6 +13,8 @@ import type {
 } from "agora-rtc-sdk-ng";
 
 import { AGORA_APP_ID } from "@/lib/agora";
+import { supabase } from "@/lib/supabaseClient";
+
 import {
   Camera,
   CameraOff,
@@ -28,15 +30,14 @@ import {
   Dot,
 } from "lucide-react";
 
-type Props = {
-  channel: string;
-  uid?: number;
-  getToken: (channel: string, uid: number) => Promise<string>;
-  getNextStranger?: () => Promise<{ channel: string; uid?: number }>;
-  onLeave?: () => void;
-};
-
 type Facing = "user" | "environment";
+
+type Props = {
+  getToken: (channel: string, uid: number) => Promise<string>;
+  onLeave?: () => void;
+  userId: string; // Supabase auth user id
+  uid?: number;   // optional: agar khud uid dena ho
+};
 
 let AgoraRTC: any | null = null;
 
@@ -45,17 +46,17 @@ function randomAgoraUid() {
 }
 
 export default function VideoCall({
-  channel,
-  uid: initialUid,
   getToken,
-  getNextStranger,
   onLeave,
+  userId,
+  uid: initialUid,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const remoteRef = useRef<HTMLDivElement>(null);
 
   const [client, setClient] = useState<IAgoraRTCClient | null>(null);
   const [uid, setUid] = useState<number>(initialUid ?? randomAgoraUid());
+  const [channel, setChannel] = useState<string | null>(null);
   const [joinedChannel, setJoinedChannel] = useState<string | null>(null);
 
   const [localVideoTrack, setLocalVideoTrack] = useState<ICameraVideoTrack | null>(null);
@@ -74,6 +75,9 @@ export default function VideoCall({
 
   const [matchCountdown, setMatchCountdown] = useState<number | null>(null);
   const pendingNextRef = useRef(false);
+
+  // current DB session id (video_sessions)
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   // ---------- Load Agora SDK + create client ----------
   useEffect(() => {
@@ -96,6 +100,8 @@ export default function VideoCall({
       mounted = false;
     };
   }, [client]);
+
+  /* ------------------------- UI tiny components ------------------------- */
 
   const Pill = ({
     children,
@@ -142,6 +148,8 @@ export default function VideoCall({
       </button>
     );
   };
+
+  /* --------------------- Video track helpers ---------------------------- */
 
   const playLocalInto = useCallback((track: ILocalVideoTrack) => {
     if (!containerRef.current) return;
@@ -219,8 +227,148 @@ export default function VideoCall({
     setLocalAudioTrack(null);
   }, [localVideoTrack, localAudioTrack]);
 
+  /* ---------------------- Session logging (video_sessions) -------------- */
+
+  const openSession = useCallback(
+    async (params: { channel: string; agoraUid: number; startReason?: string }) => {
+      try {
+        if (!userId) {
+          console.warn("[Session] No userId, skipping openSession");
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("video_sessions")
+          .insert({
+            user_id: userId,
+            channel: params.channel,
+            agora_uid: params.agoraUid,
+            status: "open",
+            start_reason: params.startReason ?? "join",
+          })
+          .select("id")
+          .single();
+
+        if (error) {
+          console.error("[Session] openSession error:", error);
+          return;
+        }
+
+        setSessionId(data.id);
+        console.log("[Session] opened", data.id);
+      } catch (err) {
+        console.error("[Session] openSession exception:", err);
+      }
+    },
+    [userId]
+  );
+
+  const closeSession = useCallback(
+    async (reason: "leave" | "next" | "disconnect" = "leave") => {
+      if (!sessionId) return;
+      try {
+        const { error } = await supabase
+          .from("video_sessions")
+          .update({
+            status: "closed",
+            end_reason: reason,
+            ended_at: new Date().toISOString(),
+          })
+          .eq("id", sessionId);
+
+        if (error) {
+          console.error("[Session] closeSession error:", error);
+          return;
+        }
+
+        console.log("[Session] closed", sessionId, "reason:", reason);
+        setSessionId(null);
+      } catch (err) {
+        console.error("[Session] closeSession exception:", err);
+      }
+    },
+    [sessionId]
+  );
+
+  /* ----------------- Stranger matching (match_queue) -------------------- */
+
+  const getNextStranger = useCallback(async (): Promise<{ channel: string }> => {
+    if (!userId) {
+      console.error("[match] No userId, cannot match");
+      return { channel: `tego_fallback_${Math.random().toString(36).slice(2, 8)}` };
+    }
+
+    // 1) Apni purani queue rows hatao
+    await supabase.from("match_queue").delete().eq("user_id", userId);
+
+    // 2) Purane rows cleanup
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    await supabase
+      .from("match_queue")
+      .delete()
+      .lt("created_at", cutoff)
+      .eq("user_id", userId);
+
+    // 3) Koi waiting user dhundo
+    const { data: partner, error: partnerError } = await supabase
+      .from("match_queue")
+      .select("*")
+      .eq("is_matched", false)
+      .neq("user_id", userId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (partnerError) {
+      console.error("[match] partner find error:", partnerError);
+    }
+
+    let nextChannel: string;
+
+    if (partner) {
+      nextChannel = partner.channel;
+
+      await supabase
+        .from("match_queue")
+        .update({
+          is_matched: true,
+          matched_with: userId,
+        })
+        .eq("id", partner.id);
+
+      await supabase.from("match_queue").insert({
+        user_id: userId,
+        channel: nextChannel,
+        is_matched: true,
+        matched_with: partner.user_id,
+      });
+
+      console.log("[match] paired with", partner.user_id, "on", nextChannel);
+    } else {
+      nextChannel = `tego_${Math.random().toString(36).slice(2, 10)}`;
+
+      await supabase.from("match_queue").insert({
+        user_id: userId,
+        channel: nextChannel,
+        is_matched: false,
+        matched_with: null,
+      });
+
+      console.log("[match] waiting alone on", nextChannel);
+    }
+
+    return { channel: nextChannel };
+  }, [userId]);
+
+  /* --------------------- Join / Leave channel --------------------------- */
+
   const joinChannel = useCallback(
-    async (ch: string, u: number, initialFacing: Facing = "user", retryOnUidConflict = true) => {
+    async (
+      ch: string,
+      u: number,
+      initialFacing: Facing = "user",
+      retryOnUidConflict = true
+    ) => {
       if (!client || !AgoraRTC) {
         console.warn("[Agora] client/SDK not ready yet");
         return;
@@ -249,6 +397,8 @@ export default function VideoCall({
         setAudioEnabled(true);
         joinStateRef.current = "joined";
         console.log("[Agora] joined", ch, "as", u);
+
+        await openSession({ channel: ch, agoraUid: u, startReason: "join" });
       } catch (err: any) {
         console.error("[Agora] joinChannel error:", err);
 
@@ -272,34 +422,41 @@ export default function VideoCall({
         setBusy(false);
       }
     },
-    [attachRemoteHandlers, client, createLocalTracks, getToken]
+    [attachRemoteHandlers, client, createLocalTracks, getToken, openSession]
   );
 
-  const leaveChannel = useCallback(async () => {
-    if (joinStateRef.current === "idle" || !client) {
-      return;
-    }
+  const leaveChannel = useCallback(
+    async (reason: "leave" | "next" | "disconnect" = "leave") => {
+      if (joinStateRef.current === "idle" || !client) {
+        await closeSession(reason);
+        return;
+      }
 
-    setBusy(true);
-    try {
+      setBusy(true);
       try {
-        await client.unpublish();
-      } catch {}
+        try {
+          await client.unpublish();
+        } catch {}
 
-      await destroyLocalTracks();
+        await destroyLocalTracks();
 
-      try {
-        await client.leave();
-      } catch {}
+        try {
+          await client.leave();
+        } catch {}
 
-      remoteRef.current?.replaceChildren();
-      setJoinedChannel(null);
-      joinStateRef.current = "idle";
-      console.log("[Agora] left channel");
-    } finally {
-      setBusy(false);
-    }
-  }, [client, destroyLocalTracks]);
+        remoteRef.current?.replaceChildren();
+        setJoinedChannel(null);
+        joinStateRef.current = "idle";
+        console.log("[Agora] left channel");
+      } finally {
+        setBusy(false);
+        await closeSession(reason);
+      }
+    },
+    [client, destroyLocalTracks, closeSession]
+  );
+
+  /* --------------------- Camera facing helpers -------------------------- */
 
   const guessDeviceForFacing = useCallback(
     (want: Facing) => {
@@ -357,38 +514,31 @@ export default function VideoCall({
     await switchToFacing(next);
   }, [facing, switchToFacing]);
 
-  const nextStranger = useCallback(
-    async () => {
-      if (!getNextStranger) {
-        await leaveChannel();
-        onLeave?.();
-        return;
-      }
+  /* ----------------------- Next / Skip logic ---------------------------- */
 
-      await leaveChannel();
+  const nextStranger = useCallback(async () => {
+    await leaveChannel("next");
 
-      const { channel: newChannel, uid: maybeUid } = await getNextStranger();
+    const { channel: newChannel } = await getNextStranger();
+    setChannel(newChannel);
 
-      const nextUid = typeof maybeUid === "number" ? maybeUid : randomAgoraUid();
-      setUid(nextUid);
+    const nextUid = randomAgoraUid();
+    setUid(nextUid);
 
-      await joinChannel(newChannel, nextUid, facing);
-    },
-    [getNextStranger, joinChannel, leaveChannel, onLeave, facing]
-  );
+    await joinChannel(newChannel, nextUid, facing);
+  }, [leaveChannel, getNextStranger, joinChannel, facing]);
 
   const queueNextMatch = useCallback(() => {
-    if (!getNextStranger) return;
     if (matchCountdown !== null || pendingNextRef.current) return;
     pendingNextRef.current = true;
     setIsSwitching(true);
     setMatchCountdown(6);
-  }, [getNextStranger, matchCountdown]);
+  }, [matchCountdown]);
 
   const skipStranger = useCallback(() => {
-    if (!getNextStranger || busy || isSwitching || matchCountdown !== null) return;
+    if (busy || isSwitching || matchCountdown !== null) return;
     queueNextMatch();
-  }, [getNextStranger, busy, isSwitching, matchCountdown, queueNextMatch]);
+  }, [busy, isSwitching, matchCountdown, queueNextMatch]);
 
   useEffect(() => {
     if (matchCountdown === null) return;
@@ -414,7 +564,6 @@ export default function VideoCall({
   }, [matchCountdown, nextStranger]);
 
   useEffect(() => {
-    if (!getNextStranger) return;
     const onKey = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
       if (key === "s" || (e.shiftKey && key === "n")) {
@@ -424,15 +573,22 @@ export default function VideoCall({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [getNextStranger, skipStranger]);
+  }, [skipStranger]);
+
+  /* -------------------- Initial join + cleanup -------------------------- */
 
   useEffect(() => {
-    if (!client) return;
+    // 👈 IMPORTANT: userId ke bina match mat karo
+    if (!client || !userId) return;
     let cancelled = false;
 
     (async () => {
       try {
-        await joinChannel(channel, uid, "user");
+        const { channel: ch } = await getNextStranger();
+        if (cancelled) return;
+        setChannel(ch);
+
+        await joinChannel(ch, uid, "user");
         if (!cancelled) {
           await refreshDevices();
         }
@@ -445,16 +601,18 @@ export default function VideoCall({
       cancelled = true;
       (async () => {
         try {
-          await leaveChannel();
+          await leaveChannel("disconnect");
         } catch (err) {
           console.warn("[Agora] leave on unmount error:", err);
         } finally {
-          client.removeAllListeners?.();
+          client?.removeAllListeners?.();
         }
       })();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client]);
+  }, [client, userId]);
+
+  /* ---------------------- Simple toggles + UI data ---------------------- */
 
   const toggleVideo = async (enable: boolean) => {
     if (!localVideoTrack) return;
@@ -469,11 +627,14 @@ export default function VideoCall({
   };
 
   const leave = async () => {
-    await leaveChannel();
+    await leaveChannel("leave");
     onLeave?.();
   };
 
   const statusTone = joinedChannel ? "bg-green-600/80" : "bg-black/60";
+  const visibleChannel = joinedChannel || channel || "…";
+
+  /* ----------------------------- JSX ------------------------------------ */
 
   return (
     <div className="w-full grid place-items-center">
@@ -488,26 +649,23 @@ export default function VideoCall({
           shadow-[0_20px_60px_-20px_rgba(108,92,231,0.35)]
         "
       >
-        {/* Top bar - Status pills moved to top right */}
+        {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 sm:px-4 py-2">
-          {/* LEFT: Stranger + (mobile) room info */}
           <div className="flex flex-col items-start gap-1">
             <Pill>
               <User className="h-3.5 w-3.5" />
               Stranger
             </Pill>
 
-            {/* Mobile-only room id + uid so bottom pe clutter na ho */}
             <div className="md:hidden">
               <Pill bg="bg-black/70">
-                <span className="text-[10px]">{joinedChannel || channel}</span>
+                <span className="text-[10px]">{visibleChannel}</span>
                 <span className="text-white/30 mx-1">•</span>
                 <span className="text-[10px]">#{uid}</span>
               </Pill>
             </div>
           </div>
 
-          {/* RIGHT: status */}
           <div className="flex items-center gap-2">
             <Pill bg={statusTone}>
               <Dot className="h-4 w-4" />
@@ -528,7 +686,7 @@ export default function VideoCall({
           </div>
         </div>
 
-        {/* RTC Status - Bottom of top bar (desktop only) */}
+        {/* RTC mini status */}
         <div className="absolute top-12 right-3 sm:right-4 z-20">
           <div className="hidden md:flex items-center gap-2 text-xs text-gray-200 bg-black/40 backdrop-blur rounded-full px-3 py-1.5">
             <Wifi className="h-4 w-4 opacity-80" />
@@ -551,8 +709,6 @@ export default function VideoCall({
           <div className="relative">
             <div className="absolute inset-0 bg-black/95 ring-1 ring-white/10" />
             <div ref={remoteRef} className="absolute inset-0" />
-
-            {/* Gradient + border overlays only */}
             <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-black/20" />
             <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5" />
           </div>
@@ -576,48 +732,44 @@ export default function VideoCall({
                 </div>
               </div>
             )}
-
-            {/* Gradient + border overlays only */}
             <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-black/20" />
             <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5" />
           </div>
         </div>
 
-        {/* Right overlay actions */}
+        {/* Right side controls (Skip / Next / Mic / Cam) */}
         <div className="absolute right-3 sm:right-4 bottom-28 md:bottom-8 z-30 flex flex-col items-center gap-3">
-          {getNextStranger && (
-            <>
-              <RoundBtn
-                onClick={skipStranger}
-                title="Skip (S or Shift+N)"
-                disabled={busy || isSwitching || matchCountdown !== null}
-              >
-                {isSwitching && matchCountdown !== null ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <SkipForward className="h-5 w-5" />
-                )}
-              </RoundBtn>
-              <span className="text-[10px] text-white/90 drop-shadow">Skip</span>
+          <>
+            <RoundBtn
+              onClick={skipStranger}
+              title="Skip (S or Shift+N)"
+              disabled={busy || isSwitching || matchCountdown !== null}
+            >
+              {isSwitching && matchCountdown !== null ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <SkipForward className="h-5 w-5" />
+              )}
+            </RoundBtn>
+            <span className="text-[10px] text-white/90 drop-shadow">Skip</span>
 
-              <RoundBtn
-                onClick={queueNextMatch}
-                title="Next"
-                disabled={busy || isSwitching || matchCountdown !== null}
-              >
-                <Play className="h-5 w-5" />
-              </RoundBtn>
-              <span className="text-[10px] text-white/90 drop-shadow">
-                {matchCountdown !== null ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-white/20 bg-white/10">
-                    Next in <span className="ml-1 font-semibold">{matchCountdown}s</span>
-                  </span>
-                ) : (
-                  "Next"
-                )}
-              </span>
-            </>
-          )}
+            <RoundBtn
+              onClick={queueNextMatch}
+              title="Next"
+              disabled={busy || isSwitching || matchCountdown !== null}
+            >
+              <Play className="h-5 w-5" />
+            </RoundBtn>
+            <span className="text-[10px] text-white/90 drop-shadow">
+              {matchCountdown !== null ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-white/20 bg-white/10">
+                  Next in <span className="ml-1 font-semibold">{matchCountdown}s</span>
+                </span>
+              ) : (
+                "Next"
+              )}
+            </span>
+          </>
 
           <RoundBtn
             onClick={() => toggleVideo(!videoEnabled)}
@@ -651,24 +803,22 @@ export default function VideoCall({
           </RoundBtn>
         </div>
 
-        {/* Bottom left info (desktop only, taaki mobile pe beech me na aaye) */}
+        {/* Bottom left info */}
         <div className="absolute left-3 sm:left-4 bottom-4 z-20 hidden md:block">
           <div className="flex items-center gap-2 text-[11px] text-white/80 bg-black/40 backdrop-blur rounded-full px-3 py-1.5 ring-1 ring-white/10">
-            <span className="font-medium">{joinedChannel || channel}</span>
+            <span className="font-medium">{visibleChannel}</span>
             <span className="text-white/30">•</span>
             <span>#{uid}</span>
           </div>
         </div>
 
-        {/* Keyboard shortcut hint (desktop only) */}
-        {getNextStranger && (
-          <div className="absolute left-1/2 -translate-x-1/2 bottom-20 z-20 hidden md:block">
-            <div className="text-[10px] text-white/70 bg-black/30 backdrop-blur rounded-full px-3 py-1 ring-1 ring-white/10">
-              Press <span className="font-bold text-white">S</span> or{" "}
-              <span className="font-bold text-white">Shift+N</span> to skip
-            </div>
+        {/* Keyboard shortcut hint (desktop) */}
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-20 z-20 hidden md:block">
+          <div className="text-[10px] text-white/70 bg-black/30 backdrop-blur rounded-full px-3 py-1 ring-1 ring-white/10">
+            Press <span className="font-bold text-white">S</span> or{" "}
+            <span className="font-bold text-white">Shift+N</span> to skip
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
