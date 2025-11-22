@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   Maximize2,
   Sparkles,
@@ -8,6 +8,8 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type { Status } from "@/components/ACCENT";
+import { supabase } from "@/lib/supabaseClient";
 
 const people = [
   {
@@ -61,15 +63,136 @@ const features = [
   { icon: ChevronDown, label: "Smart Filters", description: "Match by interest & region" },
 ];
 
+function statusLabel(status: Status) {
+  switch (status) {
+    case "idle":
+      return "Ready to connect";
+    case "pairing":
+      return "Connecting…";
+    case "waiting":
+      return "Searching for a stranger…";
+    case "paired":
+      return "Found a match!";
+    case "error":
+      return "Something went wrong";
+    default:
+      return "";
+  }
+}
+
 export default function HomePage() {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [onlineCount, setOnlineCount] = useState(15234);
-  const router = useRouter();
 
+  const [status, setStatus] = useState<Status>("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Unique uid for matching API
+  const uid = useMemo(() => Math.floor(Math.random() * 10_000_000), []);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMounted = useRef(true);
+
+  const clearPoll = () => {
+    if (pollTimer.current) {
+      clearTimeout(pollTimer.current);
+      pollTimer.current = null;
+    }
+  };
+
+  // ❌ OLD PROTECT PAGE useEffect HATA DIYA
+  // useEffect(() => {
+  //   async function checkAuth() {
+  //     const { data } = await supabase.auth.getUser();
+  //     if (!data?.user) {
+  //       router.push("/auth");
+  //     }
+  //   }
+  //   checkAuth();
+  // }, [router]);
+
+  const pollOnce = useCallback(async () => {
+    try {
+      const again = await fetch("/api/match", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ uid }),
+      });
+
+      const result = await again.json().catch(() => ({} as any));
+      if (result.status === "paired" && result.channel) {
+        clearPoll();
+        if (!isMounted.current) return;
+        setStatus("paired");
+        router.push(`/call/${result.channel}?uid=${uid}`);
+        return;
+      }
+
+      if (status === "waiting" && isMounted.current) {
+        const delay = 2500 + Math.floor(Math.random() * 1000);
+        pollTimer.current = setTimeout(pollOnce, delay);
+      }
+    } catch (e: any) {
+      if (!isMounted.current) return;
+      setStatus("error");
+      setErrorMsg(e?.message || "Something went wrong while pairing.");
+    }
+  }, [router, status, uid]);
+
+  const tryPair = useCallback(async () => {
+    clearPoll();
+    setErrorMsg(null);
+
+    // ✅ CLICK PAR AUTH CHECK
+    const { data, error } = await supabase.auth.getUser();
+
+    if (error) {
+      console.error("Auth check error:", error);
+    }
+
+    if (!data?.user) {
+      // user NOT logged in → auth page
+      router.push("/auth");
+      return;
+    }
+
+    // user logged in → proceed with pairing
+    setStatus("pairing");
+    try {
+      const res = await fetch("/api/match", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ uid }),
+      });
+      const dataRes = await res.json();
+
+      if (dataRes.status === "paired" && dataRes.channel) {
+        setStatus("paired");
+        router.push(`/call/${dataRes.channel}?uid=${uid}`);
+        return;
+      }
+
+      if (dataRes.status === "waiting") {
+        setStatus("waiting");
+        pollTimer.current = setTimeout(pollOnce, 1000);
+        return;
+      }
+
+      setStatus("error");
+      setErrorMsg(dataRes?.error || "Unable to pair right now.");
+    } catch (e: any) {
+      setStatus("error");
+      setErrorMsg(e?.message || "Network error. Please try again.");
+    }
+  }, [pollOnce, router, uid]);
+
+  // Camera + fake online count
   useEffect(() => {
+    let stream: MediaStream | null = null;
+
     async function enableCam() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "user" },
           audio: false,
         });
@@ -89,8 +212,17 @@ export default function HomePage() {
       setOnlineCount((prev) => prev + Math.floor(Math.random() * 10 - 5));
     }, 3000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      isMounted.current = false;
+      clearPoll();
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
+      }
+    };
   }, []);
+
+  const isBusy = status === "pairing" || status === "waiting";
 
   // All avatar circle gradients tuned to TEGO theme
   const gradientColors = [
@@ -170,7 +302,7 @@ export default function HomePage() {
 
               {/* Bottom Filters + Start */}
               <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-4 px-4 z-10">
-                {/* Filters */}
+                {/* Filters (UI only for now) */}
                 <div className="flex w-full justify-center gap-3 max-w-xl flex-wrap">
                   <button className="flex items-center gap-2 rounded-2xl bg-black/50 backdrop-blur-xl px-5 py-3 text-sm font-medium border border-[#8B3DFF66] shadow-lg hover:bg-[#111827] hover:border-[#8B3DFFAA] transition-all duration-300">
                     <span className="text-lg">⚧</span>
@@ -185,21 +317,43 @@ export default function HomePage() {
                   </button>
                 </div>
 
-                {/* Start Button – redirect to /find-strangers */}
-                <button
-                  className="group flex items-center justify-center gap-3 rounded-2xl bg-linear-to-r from-[#8B3DFF] via-[#4F46E5] to-[#22C55E] px-10 py-4 font-bold text-base shadow-2xl shadow-[#4F46E5AA] hover:shadow-[#4F46E5DD] hover:scale-[1.02] transition-all duration-300"
-                  onClick={() => router.push("/find-strangers")}
-                >
-                  <div className="-ml-3 flex">
-                    {gradientColors.map((color, i) => (
-                      <div
-                        key={i}
-                        className={`h-8 w-8 rounded-full border-2 border-white -ml-2 bg-linear-to-tr ${color} shadow-lg shadow-black/40`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-white">Start Video Chat</span>
-                </button>
+                {/* Start Button – now uses pairing logic + auth check */}
+                <div className="flex flex-col items-center gap-2">
+                  <button
+                    className={`group flex items-center justify-center gap-3 rounded-2xl px-10 py-4 font-bold text-base shadow-2xl hover:shadow-[#4F46E5DD] transition-all duration-300 ${
+                      isBusy
+                        ? "bg-[#4B5563] cursor-not-allowed opacity-80 shadow-none"
+                        : "bg-linear-to-r from-[#8B3DFF] via-[#4F46E5] to-[#22C55E] hover:scale-[1.02] shadow-[#4F46E5AA]"
+                    }`}
+                    onClick={tryPair}
+                    disabled={isBusy}
+                  >
+                    <div className="-ml-3 flex">
+                      {gradientColors.map((color, i) => (
+                        <div
+                          key={i}
+                          className={`h-8 w-8 rounded-full border-2 border-white -ml-2 bg-linear-to-tr ${color} shadow-lg shadow-black/40`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-white">
+                      {status === "idle" && "Start Video Chat"}
+                      {status === "pairing" && "Connecting…"}
+                      {status === "waiting" && "Searching for a stranger…"}
+                      {status === "error" && "Try Again"}
+                      {status === "paired" && "Connecting to Call…"}
+                    </span>
+                  </button>
+
+                  <p className="text-xs text-white/70">
+                    Status: <span className="font-medium">{statusLabel(status)}</span>
+                  </p>
+                  {errorMsg && (
+                    <p className="text-xs text-red-300 text-center max-w-xs">
+                      {errorMsg}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
