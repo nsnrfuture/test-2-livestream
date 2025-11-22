@@ -48,7 +48,7 @@ export default function UpdatePasswordPage() {
         console.log("UPDATE PASSWORD SUCCESS:", data);
         setMessage("Password updated successfully. Redirecting to login...");
         setTimeout(() => {
-          router.push("/auth/login"); // 👈 login agar /auth/login pe hai
+          router.push("/login"); // 👈 login agar /auth/login pe hai
         }, 1500);
       }
     } catch (err: any) {
