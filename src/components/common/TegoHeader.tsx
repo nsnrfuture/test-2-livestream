@@ -185,13 +185,13 @@ export default function TegoHeader() {
             /* LOGGED OUT: show Sign in / Sign up */
             <>
               <Link
-                href="/auth/login"
+                href="/login"
                 className="hidden sm:inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-xs font-semibold text-black shadow hover:bg-white/90 transition"
               >
                 Sign in
               </Link>
               <Link
-                href="/auth/signup"
+                href="/signup"
                 className="hidden sm:inline-flex items-center justify-center rounded-full border border-white/30 px-4 py-2 text-xs font-semibold text-white hover:bg-white/10 transition"
               >
                 Sign up
@@ -298,14 +298,14 @@ export default function TegoHeader() {
               /* If logged OUT in mobile */
               <>
                 <Link
-                  href="/auth/login"
+                  href="/login"
                   onClick={() => setOpen(false)}
                   className="py-2 px-3 rounded-lg bg-white text-black font-semibold text-sm text-center"
                 >
                   Sign in
                 </Link>
                 <Link
-                  href="/auth/signup"
+                  href="/signup"
                   onClick={() => setOpen(false)}
                   className="py-2 px-3 rounded-lg border border-white/30 text-white font-semibold text-sm text-center"
                 >

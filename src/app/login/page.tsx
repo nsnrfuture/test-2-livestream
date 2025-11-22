@@ -73,7 +73,7 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Password */}
+          {/* Password + Forgot link */}
           <div className="space-y-1">
             <label className="block text-sm text-neutral-300">Password</label>
             <div className="relative">
@@ -92,6 +92,16 @@ export default function LoginPage() {
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
+            </div>
+
+            {/* 👉 FORGOT PASSWORD LINK */}
+            <div className="flex justify-end mt-1">
+              <Link
+                href="/forget-password"
+                className="text-xs text-indigo-400 hover:text-indigo-300"
+              >
+                Forgot password?
+              </Link>
             </div>
           </div>
 
@@ -121,7 +131,7 @@ export default function LoginPage() {
         <p className="mt-4 text-xs text-neutral-400 text-center">
           Don&apos;t have an account?{" "}
           <Link
-            href="/auth/signup"
+            href="/signup"
             className="text-indigo-400 hover:text-indigo-300 font-medium"
           >
             Sign up
