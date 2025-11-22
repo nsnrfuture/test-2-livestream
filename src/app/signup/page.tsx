@@ -63,7 +63,7 @@ export default function SignupPage() {
         setError(error.message);
       } else {
         setMessage(
-          "Signup successful! Please check your email indox/spam box to verify your account."
+          "Signup successful! Please check your email inbox/spam box to verify your account."
         );
         // Optionally clear form
         // setFullName("");
