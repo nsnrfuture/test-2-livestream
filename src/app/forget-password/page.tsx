@@ -1,7 +1,7 @@
 // app/forget-password/page.tsx
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState, FormEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 
@@ -24,21 +24,23 @@ export default function ForgetPasswordPage() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        // yaha define kar rahe ho email ke link ke baad user kahan land karega
+        // ✅ ab yaha /update-password (auth ke bahar)
         redirectTo:
           typeof window !== "undefined"
-            ? `${window.location.origin}/auth/update-password`
+            ? `${window.location.origin}/update-password`
             : undefined,
       });
 
       if (error) {
-        setError(error.message);
+        console.error("RESET EMAIL ERROR:", error);
+        setError(error.message || "Error sending recovery email.");
       } else {
         setMessage(
           "If this email exists, we’ve sent a password reset link. Please check your inbox."
         );
       }
     } catch (err: any) {
+      console.error("RESET EMAIL CATCH:", err);
       setError(err?.message || "Something went wrong.");
     } finally {
       setLoading(false);
@@ -66,7 +68,7 @@ export default function ForgetPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="your@example.com"
+              placeholder="you@example.com"
             />
           </div>
 
@@ -93,7 +95,7 @@ export default function ForgetPasswordPage() {
         <p className="mt-4 text-xs text-neutral-400 text-center">
           Remembered it?{" "}
           <Link
-            href="/login"
+            href="/login"  // 👈 agar tumhara login yahi hai
             className="text-indigo-400 hover:text-indigo-300 font-medium"
           >
             Back to login

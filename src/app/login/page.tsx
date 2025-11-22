@@ -1,7 +1,7 @@
 // app/auth/login/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
@@ -17,7 +17,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSignin(e: React.FormEvent) {
+  async function handleSignin(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setMessage(null);
@@ -94,7 +94,7 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {/* 👉 FORGOT PASSWORD LINK */}
+            {/* Forgot password */}
             <div className="flex justify-end mt-1">
               <Link
                 href="/forget-password"
