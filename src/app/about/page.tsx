@@ -35,7 +35,7 @@ const team: TeamMember[] = [
     name: "Bhawna Bharti",
     role: "UI / UX Designer",
     tag: "Design & Experience",
-    linkedin: "https://www.linkedin.com/in/bhawna-bharti-tego", // TODO: replace with real URL
+    linkedin: "https://www.linkedin.com/in/bhawna-bharti-09652a21a", // TODO: replace with real URL
   },
   {
     name: "Priyanka Goyal",
@@ -50,16 +50,16 @@ const team: TeamMember[] = [
     linkedin: "https://www.linkedin.com/in/soniya-tego", // TODO: replace with real URL
   },
   {
-    name: "Vikram",
+    name: "Amith Vikram",
     role: "SEO & Google Ads",
     tag: "Performance Marketing",
-    linkedin: "https://www.linkedin.com/in/vikram-seo-tego", // TODO: replace with real URL
+    linkedin: "https://www.linkedin.com/in/amith-vikram-9282b5211/", // TODO: replace with real URL
   },
   {
     name: "Tamanna Singh",
     role: "Junior Marketing",
     tag: "Brand & Social",
-    linkedin: "https://www.linkedin.com/in/tamanna-singh-tego", // TODO: replace with real URL
+    linkedin: "https://www.linkedin.com/in/tamanna-singh-75b275339", // TODO: replace with real URL
   },
   {
     name: "Ajay Singh",
