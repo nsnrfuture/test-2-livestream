@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Check } from "lucide-react";
 
 const ACCENT = "#8B3DFF";
@@ -105,6 +106,25 @@ const PLANS: Plan[] = [
 ];
 
 export default function PricingPage() {
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+
+  // Each plan can have its own selected billing label (Monthly / Quarterly / Yearly)
+  const [selectedBilling, setSelectedBilling] = useState<Record<string, string>>(
+    {}
+  );
+
+  const handleSelectPlan = (planName: string) => {
+    setSelectedPlan(planName);
+  };
+
+  const handleSelectBilling = (planName: string, label: string) => {
+    setSelectedPlan(planName); // also select this plan
+    setSelectedBilling((prev) => ({
+      ...prev,
+      [planName]: label,
+    }));
+  };
+
   return (
     <main className="min-h-screen bg-linear-to-b from-neutral-950 via-neutral-900 to-black text-white">
       <section className="mx-auto max-w-6xl px-4 py-20">
@@ -118,8 +138,8 @@ export default function PricingPage() {
             <span className="text-[hsl(265,100%,70%)]">chat & match</span> plan
           </h1>
           <p className="mt-4 text-sm sm:text-base text-white/60">
-            All plans include secure one-to-one chat and daily matches.
-            Minutes = total talk time you can use; matches reset every day.
+            All plans include secure one-to-one chat and daily matches. Minutes
+            = total talk time you can use; matches reset every day.
           </p>
         </div>
 
@@ -128,96 +148,141 @@ export default function PricingPage() {
           <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(139,61,255,0.6)] bg-[rgba(139,61,255,0.12)] px-4 py-2 text-xs sm:text-sm text-white/80">
             <span className="inline-block h-2 w-2 rounded-full bg-[hsl(96,100%,70%)]" />
             <span>
-              New users get <span className="font-semibold">15 days/15-min free trial</span> on any plan.
+              New users get{" "}
+              <span className="font-semibold">15 days/15-min free trial</span>{" "}
+              on any plan.
             </span>
           </div>
         </div>
 
         {/* Cards */}
         <div className="grid gap-8 md:grid-cols-3">
-          {PLANS.map((plan) => (
-            <article
-              key={plan.name}
-              className={`relative flex flex-col rounded-3xl border bg-white/5 p-6 sm:p-7 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.55)] transition-transform ${
-                plan.highlight
-                  ? "border-[rgba(139,61,255,0.9)] ring-2 ring-[rgba(139,61,255,0.4)] scale-[1.02]"
-                  : "border-white/8"
-              }`}
-            >
-              {/* Tag */}
-              {plan.tag && (
-                <div className="absolute -top-3 left-6">
-                  <span
-                    className="rounded-full px-3 py-1 text-xs font-semibold text-neutral-900"
-                    style={{ background: ACCENT }}
-                  >
-                    {plan.tag}
-                  </span>
-                </div>
-              )}
+          {PLANS.map((plan) => {
+            const isSelected = selectedPlan === plan.name;
+            const selectedBillingLabel = selectedBilling[plan.name];
 
-              {/* Title */}
-              <div className="mb-5 mt-1">
-                <h2 className="text-xl sm:text-2xl font-semibold">
-                  {plan.name} Plan
-                </h2>
-                <p className="mt-2 text-sm text-white/60">
-                  {plan.description}
-                </p>
-              </div>
-
-              {/* Billing table */}
-              <div className="mb-6 space-y-3">
-                {plan.billing.map((b) => (
-                  <div
-                    key={b.label}
-                    className="rounded-2xl border border-white/10 bg-black/30 px-3 py-3 text-sm flex flex-col gap-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{b.label}</span>
-                      <span className="text-base font-semibold">{b.price}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-white/60">
-                      <span>{b.minutes}</span>
-                      <span>{b.hours}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Features */}
-              <ul className="space-y-2 text-sm text-white/75 mb-6">
-                <li className="flex items-start gap-2">
-                  <Check className="mt-0.5 h-4 w-4 text-[hsl(96,100%,70%)]" />
-                  <span>1-to-1 private chat with video & audio.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="mt-0.5 h-4 w-4 text-[hsl(96,100%,70%)]" />
-                  <span>{plan.matchInfo}</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="mt-0.5 h-4 w-4 text-[hsl(96,100%,70%)]" />
-                  <span>{plan.genderInfo}</span>
-                </li>
-              </ul>
-
-              {/* CTA */}
-              <button
-                className={`mt-auto w-full rounded-2xl px-4 py-3 text-sm font-semibold transition ${
-                  plan.highlight
-                    ? "bg-[hsl(265,100%,70%)] text-neutral-900 hover:bg-[hsl(265,100%,75%)]"
-                    : "bg-white/5 text-white hover:bg-white/10"
-                }`}
+            return (
+              <article
+                key={plan.name}
+                onClick={() => handleSelectPlan(plan.name)}
+                className={`
+                  relative flex flex-col rounded-3xl border bg-white/5 p-6 sm:p-7
+                  backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.55)]
+                  transition-transform cursor-pointer
+                  ${
+                    plan.highlight
+                      ? "border-[rgba(139,61,255,0.9)]"
+                      : "border-white/8"
+                  }
+                  ${
+                    isSelected
+                      ? "ring-4 ring-[rgba(139,61,255,0.8)] scale-[1.04] shadow-[0_0_25px_rgba(139,61,255,0.7)]"
+                      : "hover:scale-[1.01]"
+                  }
+                `}
               >
-                Start 15-day/15-min free trial
-              </button>
-            </article>
-          ))}
+                {/* Tag */}
+                {plan.tag && (
+                  <div className="absolute -top-3 left-6">
+                    <span
+                      className="rounded-full px-3 py-1 text-xs font-semibold text-neutral-900"
+                      style={{ background: ACCENT }}
+                    >
+                      {plan.tag}
+                    </span>
+                  </div>
+                )}
+
+                {/* Title */}
+                <div className="mb-5 mt-1">
+                  <h2 className="text-xl sm:text-2xl font-semibold">
+                    {plan.name} Plan
+                  </h2>
+                  <p className="mt-2 text-sm text-white/60">
+                    {plan.description}
+                  </p>
+                </div>
+
+                {/* Billing table */}
+                <div className="mb-6 space-y-3">
+                  {plan.billing.map((b) => {
+                    const isBillingSelected = selectedBillingLabel === b.label;
+
+                    return (
+                      <button
+                        key={b.label}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectBilling(plan.name, b.label);
+                        }}
+                        className={`
+                          w-full rounded-2xl border px-3 py-3 text-sm flex flex-col gap-2 text-left
+                          transition
+                          ${
+                            isBillingSelected
+                              ? "border-[rgba(139,61,255,0.9)] bg-[rgba(139,61,255,0.16)] shadow-[0_0_18px_rgba(139,61,255,0.6)]"
+                              : "border-white/10 bg-black/30 hover:border-[rgba(139,61,255,0.7)] hover:bg-black/50"
+                          }
+                        `}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{b.label}</span>
+                          <span className="text-base font-semibold">
+                            {b.price}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-white/60">
+                          <span>{b.minutes}</span>
+                          <span>{b.hours}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Features */}
+                <ul className="space-y-2 text-sm text-white/75 mb-6">
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 text-[hsl(96,100%,70%)]" />
+                    <span>1-to-1 private chat with video & audio.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 text-[hsl(96,100%,70%)]" />
+                    <span>{plan.matchInfo}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 text-[hsl(96,100%,70%)]" />
+                    <span>{plan.genderInfo}</span>
+                  </li>
+                </ul>
+
+                {/* CTA */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectPlan(plan.name);
+                  }}
+                  className={`mt-auto w-full rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                    plan.highlight
+                      ? "bg-[hsl(265,100%,70%)] text-neutral-900 hover:bg-[hsl(265,100%,75%)]"
+                      : "bg-white/5 text-white hover:bg-white/10"
+                  }`}
+                >
+                  {isSelected
+                    ? selectedBillingLabel
+                      ? `Selected: ${selectedBillingLabel} ✓ – Start 15-day/15-min free trial`
+                      : "Selected ✓ – Start 15-day/15-min free trial"
+                    : "Start 15-day/15-min free trial"}
+                </button>
+              </article>
+            );
+          })}
         </div>
 
         <p className="mt-8 text-center text-[11px] text-white/40">
-          * Cost & profit per user are calculated internally in your admin dashboard and are not
-          shown on this pricing page.
+          * Cost & profit per user are calculated internally in your admin
+          dashboard and are not shown on this pricing page.
         </p>
       </section>
     </main>
