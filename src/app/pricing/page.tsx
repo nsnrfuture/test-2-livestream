@@ -128,7 +128,7 @@ export default function PricingPage() {
           <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(139,61,255,0.6)] bg-[rgba(139,61,255,0.12)] px-4 py-2 text-xs sm:text-sm text-white/80">
             <span className="inline-block h-2 w-2 rounded-full bg-[hsl(96,100%,70%)]" />
             <span>
-              New users get <span className="font-semibold">15 days free trial</span> on any plan.
+              New users get <span className="font-semibold">15 days/15-min free trial</span> on any plan.
             </span>
           </div>
         </div>
@@ -209,7 +209,7 @@ export default function PricingPage() {
                     : "bg-white/5 text-white hover:bg-white/10"
                 }`}
               >
-                Start 15-day free trial
+                Start 15-day/15-min free trial
               </button>
             </article>
           ))}
