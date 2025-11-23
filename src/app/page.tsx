@@ -152,7 +152,7 @@ export default function HomePage() {
 
     if (!data?.user) {
       // user NOT logged in → auth page
-      router.push("/auth");
+      router.push("/signup");
       return;
     }
 
