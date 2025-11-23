@@ -206,14 +206,14 @@ export default function AboutPage() {
               We use a modern stack that&apos;s tuned for real-time video,
               scalability, and fast development.
             </p>
-            <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:text-sm text-white/70">
+            {/* <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:text-sm text-white/70">
               <li>• Next.js & React</li>
               <li>• TypeScript</li>
               <li>• Agora for live video</li>
               <li>• Tailwind CSS</li>
               <li>• Supabase / PostgreSQL</li>
               <li>• Edge-friendly APIs</li>
-            </ul>
+            </ul> */}
           </div>
         </section>
 
