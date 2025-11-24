@@ -17,6 +17,11 @@
   <lastmod>2025-11-21T21:36:56+00:00</lastmod>
   <priority>0.80</priority>
 </url>
+ <url>
+    <loc>https://tego.live/contact</loc>
+    <lastmod>2025-11-24T21:41:01+01:00</lastmod>
+    <priority>1.0</priority>
+  </url>
 <url>
   <loc>https://tego.live/about</loc>
   <lastmod>2025-11-21T21:36:56+00:00</lastmod>
@@ -37,6 +42,29 @@
   <lastmod>2025-11-21T21:36:56+00:00</lastmod>
   <priority>0.80</priority>
 </url>
+<url>
+    <loc>https://tego.live/cancellations-and-refunds</loc>
+    <lastmod>2025-11-24T21:41:01+01:00</lastmod>
+    <priority>0.80</priority>
+  </url>
+   <url>
+    <loc>https://tego.live/login</loc>
+    <lastmod>2025-11-24T21:41:01+01:00</lastmod>
+    <priority>0.90</priority>
+  </url>
+
+  <url>
+    <loc>https://tego.live/signup</loc>
+    <lastmod>2025-11-24T21:41:01+01:00</lastmod>
+    <priority>0.90</priority>
+  </url>
+
+  <url>
+    <loc>https://tego.live/forget-password</loc>
+    <lastmod>2025-11-24T21:41:01+01:00</lastmod>
+    <priority>0.90</priority>
+  </url>
+
 
 
 </urlset>
