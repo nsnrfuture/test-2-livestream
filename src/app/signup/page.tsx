@@ -3,10 +3,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation"; // 👈 ADD THIS
 import { supabase } from "@/lib/supabaseClient";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function SignupPage() {
+  const router = useRouter(); // 👈 ADD THIS
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -52,7 +55,7 @@ export default function SignupPage() {
           data: {
             full_name: fullName, // 👈 store extra info in user metadata
           },
-          // 👇 IMPORTANT: confirm hone ke baad kidhar bhejna hai
+          // 👇 confirm hone ke baad kidhar bhejna hai
           emailRedirectTo: origin ? `${origin}/login` : undefined,
         },
       });
@@ -63,13 +66,13 @@ export default function SignupPage() {
         setError(error.message);
       } else {
         setMessage(
-          "Signup successful! Please check your email inbox/spam box to verify your account."
+          "Signup successful! Please check your email inbox/spam box to verify your account. Redirecting to login in 6 seconds..."
         );
-        // Optionally clear form
-        // setFullName("");
-        // setEmail("");
-        // setPassword("");
-        // setConfirmPassword("");
+
+        // 👇 6 sec wait, then go to /login
+        setTimeout(() => {
+          router.push("/login");
+        }, 6000);
       }
     } catch (err: any) {
       console.error("SIGNUP CATCH ERROR:", err);
@@ -203,7 +206,7 @@ export default function SignupPage() {
         <p className="mt-4 text-xs text-neutral-400 text-center">
           Already have an account?{" "}
           <Link
-            href="/login" 
+            href="/login"
             className="text-indigo-400 hover:text-indigo-300 font-medium"
           >
             Login
