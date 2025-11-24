@@ -228,7 +228,6 @@ export default function VideoCall({
       if (videoEnabledRef.current) {
         playLocalInto(cam);
       } else {
-        // Cam off -> container blank, upar overlay already dikh rahi hai
         containerRef.current?.replaceChildren();
       }
 
@@ -237,7 +236,7 @@ export default function VideoCall({
       await refreshDevices();
       return { mic, cam };
     },
-    [playLocalInto, refreshDevices, audioEnabledRef, videoEnabledRef]
+    [playLocalInto, refreshDevices]
   );
 
   const destroyLocalTracks = useCallback(async () => {
@@ -411,12 +410,31 @@ export default function VideoCall({
         const token = await getToken(ch, u);
         await client.join(AGORA_APP_ID, ch, token, u);
 
-        const { mic, cam } = await createLocalTracks({ facingMode: initialFacing });
+        // 🔁 Reuse existing tracks if present, else create new
+        let mic = localAudioTrack;
+        let cam = localVideoTrack;
 
-        // 🔑 Only publish according to current toggle state
+        if (!mic || !cam) {
+          const created = await createLocalTracks({ facingMode: initialFacing });
+          mic = created.mic;
+          cam = created.cam;
+        }
+
         const tracksToPublish: any[] = [];
-        if (audioEnabledRef.current) tracksToPublish.push(mic);
-        if (videoEnabledRef.current) tracksToPublish.push(cam);
+        if (audioEnabledRef.current && mic) {
+          await mic.setEnabled(true);
+          tracksToPublish.push(mic);
+        } else if (mic) {
+          await mic.setEnabled(false);
+        }
+
+        if (videoEnabledRef.current && cam) {
+          await cam.setEnabled(true);
+          tracksToPublish.push(cam);
+        } else if (cam) {
+          await cam.setEnabled(false);
+        }
+
         if (tracksToPublish.length) {
           await client.publish(tracksToPublish);
         }
@@ -451,11 +469,16 @@ export default function VideoCall({
         setBusy(false);
       }
     },
-    [attachRemoteHandlers, client, createLocalTracks, getToken, openSession]
+    [attachRemoteHandlers, client, createLocalTracks, getToken, openSession, localAudioTrack, localVideoTrack]
   );
 
   const leaveChannel = useCallback(
-    async (reason: "leave" | "next" | "disconnect" = "leave") => {
+    async (
+      reason: "leave" | "next" | "disconnect" = "leave",
+      opts?: { destroyTracks?: boolean }
+    ) => {
+      const destroyTracks = opts?.destroyTracks ?? true;
+
       if (joinStateRef.current === "idle" || !client) {
         await closeSession(reason);
         return;
@@ -467,7 +490,9 @@ export default function VideoCall({
           await client.unpublish();
         } catch {}
 
-        await destroyLocalTracks();
+        if (destroyTracks) {
+          await destroyLocalTracks();
+        }
 
         try {
           await client.leave();
@@ -476,7 +501,7 @@ export default function VideoCall({
         remoteRef.current?.replaceChildren();
         setJoinedChannel(null);
         joinStateRef.current = "idle";
-        console.log("[Agora] left channel");
+        console.log("[Agora] left channel, destroyTracks=", destroyTracks);
       } finally {
         setBusy(false);
         await closeSession(reason);
@@ -558,7 +583,8 @@ export default function VideoCall({
   /* ----------------------- Next / Skip logic ---------------------------- */
 
   const nextStranger = useCallback(async () => {
-    await leaveChannel("next");
+    // ⚠️ Skip / Next: DO NOT destroy local tracks
+    await leaveChannel("next", { destroyTracks: false });
 
     const { channel: newChannel } = await getNextStranger();
     setChannel(newChannel);
@@ -642,7 +668,8 @@ export default function VideoCall({
       cancelled = true;
       (async () => {
         try {
-          await leaveChannel("disconnect");
+          // Final cleanup: destroyTracks = true
+          await leaveChannel("disconnect", { destroyTracks: true });
         } catch (err) {
           console.warn("[Agora] leave on unmount error:", err);
         } finally {
@@ -663,6 +690,7 @@ export default function VideoCall({
     }
     await localVideoTrack.setEnabled(enable);
     setVideoEnabled(enable);
+    videoEnabledRef.current = enable;
   };
 
   const toggleAudio = async (enable: boolean) => {
@@ -673,10 +701,11 @@ export default function VideoCall({
     }
     await localAudioTrack.setEnabled(enable);
     setAudioEnabled(enable);
+    audioEnabledRef.current = enable;
   };
 
   const leave = async () => {
-    await leaveChannel("leave");
+    await leaveChannel("leave", { destroyTracks: true });
     onLeave?.();
   };
 
