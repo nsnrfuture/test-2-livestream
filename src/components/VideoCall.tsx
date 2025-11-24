@@ -36,7 +36,7 @@ type Props = {
   getToken: (channel: string, uid: number) => Promise<string>;
   onLeave?: () => void;
   userId: string; // Supabase auth user id
-  uid?: number;   // optional: agar khud uid dena ho
+  uid?: number; // optional: agar khud uid dena ho
 };
 
 let AgoraRTC: any | null = null;
@@ -78,6 +78,18 @@ export default function VideoCall({
 
   // current DB session id (video_sessions)
   const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // 🔁 Refs to persist latest cam/mic state across joins
+  const videoEnabledRef = useRef(videoEnabled);
+  const audioEnabledRef = useRef(audioEnabled);
+
+  useEffect(() => {
+    videoEnabledRef.current = videoEnabled;
+  }, [videoEnabled]);
+
+  useEffect(() => {
+    audioEnabledRef.current = audioEnabled;
+  }, [audioEnabled]);
 
   // ---------- Load Agora SDK + create client ----------
   useEffect(() => {
@@ -199,6 +211,7 @@ export default function VideoCall({
   const createLocalTracks = useCallback(
     async (opts?: { cameraId?: string; facingMode?: Facing }) => {
       if (!AgoraRTC) throw new Error("Agora SDK not loaded");
+
       const mic = await AgoraRTC.createMicrophoneAudioTrack();
       const cam = await AgoraRTC.createCameraVideoTrack(
         opts?.cameraId
@@ -207,13 +220,24 @@ export default function VideoCall({
           ? { facingMode: opts.facingMode }
           : undefined
       );
+
+      // 🔑 Respect current mic/cam toggles
+      await mic.setEnabled(audioEnabledRef.current);
+      await cam.setEnabled(videoEnabledRef.current);
+
+      if (videoEnabledRef.current) {
+        playLocalInto(cam);
+      } else {
+        // Cam off -> container blank, upar overlay already dikh rahi hai
+        containerRef.current?.replaceChildren();
+      }
+
       setLocalAudioTrack(mic);
       setLocalVideoTrack(cam);
-      playLocalInto(cam);
       await refreshDevices();
       return { mic, cam };
     },
-    [playLocalInto, refreshDevices]
+    [playLocalInto, refreshDevices, audioEnabledRef, videoEnabledRef]
   );
 
   const destroyLocalTracks = useCallback(async () => {
@@ -388,13 +412,18 @@ export default function VideoCall({
         await client.join(AGORA_APP_ID, ch, token, u);
 
         const { mic, cam } = await createLocalTracks({ facingMode: initialFacing });
-        await client.publish([mic, cam]);
+
+        // 🔑 Only publish according to current toggle state
+        const tracksToPublish: any[] = [];
+        if (audioEnabledRef.current) tracksToPublish.push(mic);
+        if (videoEnabledRef.current) tracksToPublish.push(cam);
+        if (tracksToPublish.length) {
+          await client.publish(tracksToPublish);
+        }
 
         attachRemoteHandlers();
         setJoinedChannel(ch);
         setFacing(initialFacing);
-        setVideoEnabled(true);
-        setAudioEnabled(true);
         joinStateRef.current = "joined";
         console.log("[Agora] joined", ch, "as", u);
 
@@ -483,7 +512,11 @@ export default function VideoCall({
         if (devId) {
           try {
             await localVideoTrack.setDevice(devId);
-            playLocalInto(localVideoTrack);
+            if (videoEnabledRef.current) {
+              playLocalInto(localVideoTrack);
+            } else {
+              containerRef.current?.replaceChildren();
+            }
             setFacing(want);
             return;
           } catch {}
@@ -497,9 +530,17 @@ export default function VideoCall({
 
         if (!AgoraRTC) return;
         const newCam = await AgoraRTC.createCameraVideoTrack({ facingMode: want });
-        await client.publish(newCam);
+
+        // Respect current cam toggle
+        await newCam.setEnabled(videoEnabledRef.current);
+        if (videoEnabledRef.current) {
+          await client.publish(newCam);
+          playLocalInto(newCam);
+        } else {
+          containerRef.current?.replaceChildren();
+        }
+
         setLocalVideoTrack(newCam);
-        playLocalInto(newCam);
         setFacing(want);
         await refreshDevices();
       } finally {
@@ -615,13 +656,21 @@ export default function VideoCall({
   /* ---------------------- Simple toggles + UI data ---------------------- */
 
   const toggleVideo = async (enable: boolean) => {
-    if (!localVideoTrack) return;
+    if (!localVideoTrack) {
+      setVideoEnabled(enable);
+      videoEnabledRef.current = enable;
+      return;
+    }
     await localVideoTrack.setEnabled(enable);
     setVideoEnabled(enable);
   };
 
   const toggleAudio = async (enable: boolean) => {
-    if (!localAudioTrack) return;
+    if (!localAudioTrack) {
+      setAudioEnabled(enable);
+      audioEnabledRef.current = enable;
+      return;
+    }
     await localAudioTrack.setEnabled(enable);
     setAudioEnabled(enable);
   };
