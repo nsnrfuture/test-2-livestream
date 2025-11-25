@@ -171,6 +171,7 @@ function LivePublisher({ channel, onLeave }: LivePublisherProps) {
   const leave = useCallback(async () => {
     if (!client) return;
 
+    // prevent double leave
     if (hasLeftRef.current) {
       onLeave?.();
       return;
@@ -178,26 +179,28 @@ function LivePublisher({ channel, onLeave }: LivePublisherProps) {
     hasLeftRef.current = true;
 
     try {
-      if (mic) {
-        mic.stop();
-        mic.close();
-      }
-      if (cam) {
-        cam.stop();
-        cam.close();
-      }
+      if (joined) {
+        if (mic) {
+          mic.stop();
+          mic.close();
+        }
+        if (cam) {
+          cam.stop();
+          cam.close();
+        }
 
-      await client.unpublish();
-      await client.leave();
+        await client.unpublish().catch(() => {});
+        await client.leave().catch(() => {});
+      }
 
       setJoined(false);
       onLeave?.();
     } catch (e) {
       console.error("Agora leave error:", e);
     }
-  }, [client, mic, cam, onLeave]);
+  }, [client, mic, cam, joined, onLeave]);
 
-  // Cleanup on unmount only (no state updates)
+  // Cleanup on unmount only (no state updates after unmount)
   useEffect(() => {
     return () => {
       if (!client) return;
@@ -207,22 +210,24 @@ function LivePublisher({ channel, onLeave }: LivePublisherProps) {
 
       (async () => {
         try {
-          if (mic) {
-            mic.stop();
-            mic.close();
+          if (joined) {
+            if (mic) {
+              mic.stop();
+              mic.close();
+            }
+            if (cam) {
+              cam.stop();
+              cam.close();
+            }
+            await client.unpublish().catch(() => {});
+            await client.leave().catch(() => {});
           }
-          if (cam) {
-            cam.stop();
-            cam.close();
-          }
-          await client.unpublish();
-          await client.leave();
         } catch (e) {
           console.error("Agora cleanup on unmount error:", e);
         }
       })();
     };
-  }, [client, mic, cam]);
+  }, [client, joined, mic, cam]);
 
   const toggleMic = async () => {
     if (!mic) return;
