@@ -6,7 +6,15 @@ export async function POST(req: NextRequest) {
   try {
     const { title, hostId } = await req.json();
 
-    // Channel generate
+    // Validate: hostId is required
+    if (!hostId) {
+      return NextResponse.json(
+        { error: "hostId (user id) is required" },
+        { status: 400 }
+      );
+    }
+
+    // Clean + short slug
     const slug =
       title
         ?.toLowerCase()
@@ -14,26 +22,37 @@ export async function POST(req: NextRequest) {
         .replace(/^-+|-+$/g, "")
         .slice(0, 24) || "live";
 
+    // Unique channel id
     const channel = `${slug}_${Math.random().toString(36).slice(2, 8)}`;
 
-    // DB me room insert
-    const { error } = await supabaseAdmin.from("live_rooms").insert({
-      channel,
-      title: title || null,
-      host_id: hostId || null, // TODO: isko auth se wire kar sakte ho
-      is_live: true,
-      started_at: new Date().toISOString(),
-    });
+    // Insert into live_rooms
+    const { data, error } = await supabaseAdmin
+      .from("live_rooms")
+      .insert({
+        channel,
+        title: title || null,
+        host_id: hostId,          // ✅ Correct host ID
+        started_at: new Date().toISOString(),
+        ended_at: null,
+        is_live: true,
+        views_count: 0,
+        total_gifts: 0,
+      })
+      .select("id")
+      .single();
 
     if (error) {
-      console.error("live/start insert error:", error);
+      console.error("start live insert error:", error);
       return NextResponse.json(
-        { error: "Could not create live room" },
+        { error: error.message || "DB insert error" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ channel });
+    return NextResponse.json({
+      channel,
+      roomId: data.id,
+    });
   } catch (e: any) {
     console.error("live/start error:", e);
     return NextResponse.json(

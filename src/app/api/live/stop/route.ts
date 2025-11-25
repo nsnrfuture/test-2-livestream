@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export async function POST(req: NextRequest) {
   try {
     const { channel } = await req.json();
+
     if (!channel) {
       return NextResponse.json(
         { error: "channel required" },
@@ -15,15 +16,15 @@ export async function POST(req: NextRequest) {
     const { error } = await supabaseAdmin
       .from("live_rooms")
       .update({
-        is_live: false,
         ended_at: new Date().toISOString(),
+        is_live: false,
       })
       .eq("channel", channel);
 
     if (error) {
-      console.error("live/stop update error:", error);
+      console.error("stop live update error:", error);
       return NextResponse.json(
-        { error: "Could not stop live room" },
+        { error: error.message || "DB update error" },
         { status: 500 }
       );
     }
