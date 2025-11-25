@@ -475,7 +475,7 @@ export default function GoOnlinePage() {
 
             {/* Right: preview / info */}
             <div className="space-y-4">
-              <div className="h-full bg-linear-to-br from-white/10 via-white/[0.03] to-black/40 border border-white/15 rounded-3xl p-4 sm:p-5 backdrop-blur-2xl shadow-[0_0_45px_rgba(0,0,0,0.75)] flex flex-col justify-between">
+              <div className="h-full bg-linear-to-br from-white/10 via-white/3 to-black/40 border border-white/15 rounded-3xl p-4 sm:p-5 backdrop-blur-2xl shadow-[0_0_45px_rgba(0,0,0,0.75)] flex flex-col justify-between">
                 <div className="space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/50">
                     Preview
