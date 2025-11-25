@@ -1,3 +1,4 @@
+// app/api/live/next/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -13,30 +14,30 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // STEP 1: Fetch current live row
-    const { data: currentRow } = await supabaseAdmin
+    // current room
+    const { data: currentRoom } = await supabaseAdmin
       .from("live_rooms")
       .select("started_at")
       .eq("channel", current)
-      .eq("is_live", true)
       .single();
 
-    // STEP 2: Find the next live
+    const afterTs = currentRoom?.started_at || "1970-01-01";
+
     const { data: nextRows } = await supabaseAdmin
       .from("live_rooms")
       .select("channel, started_at")
       .eq("is_live", true)
-      .gt("started_at", currentRow?.started_at || "1970-01-01")
+      .gt("started_at", afterTs)
       .order("started_at", { ascending: true })
       .limit(1);
 
     const nextChannel = nextRows?.[0]?.channel ?? null;
 
     return NextResponse.json({ channel: nextChannel });
-  } catch (error: any) {
-    console.error("live/next error:", error);
+  } catch (e: any) {
+    console.error("live/next error:", e);
     return NextResponse.json(
-      { error: error?.message ?? "next error" },
+      { error: e?.message || "next error" },
       { status: 500 }
     );
   }

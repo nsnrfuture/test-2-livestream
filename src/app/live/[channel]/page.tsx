@@ -280,6 +280,18 @@ export default function ViewerPage() {
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const SWIPE_THRESHOLD = 60; // px
 
+  // 🔹 Track viewer on mount / channel change
+  useEffect(() => {
+    if (!channel) return;
+
+    // TODO: viewerId = supabase auth se la sakte ho
+    fetch("/api/live/view", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel, viewerId: null }),
+    }).catch(() => {});
+  }, [channel]);
+
   if (!channel) {
     return (
       <main className="min-h-screen w-full bg-neutral-950 text-white pt-24">

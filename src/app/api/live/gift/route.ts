@@ -1,44 +1,67 @@
+// app/api/live/gift/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export async function POST(req: NextRequest) {
   try {
     const { channel, type, amount, from } = await req.json();
 
-    if (!channel || typeof channel !== "string") {
+    if (!channel || !type || !amount) {
       return NextResponse.json(
-        { error: "channel required" },
+        { error: "channel, type, amount required" },
         { status: 400 }
       );
     }
 
-    if (!type || typeof type !== "string") {
+    // find room by channel
+    const { data: room, error: roomErr } = await supabaseAdmin
+      .from("live_rooms")
+      .select("id")
+      .eq("channel", channel)
+      .single();
+
+    if (roomErr || !room) {
+      console.error("gift room fetch error:", roomErr);
       return NextResponse.json(
-        { error: "type required" },
-        { status: 400 }
+        { error: "live room not found" },
+        { status: 404 }
       );
     }
 
-    if (typeof amount !== "number" || amount <= 0) {
-      return NextResponse.json(
-        { error: "amount must be a positive number" },
-        { status: 400 }
-      );
+    // 1) insert gift log
+    const { error: insertErr } = await supabaseAdmin
+      .from("live_gifts")
+      .insert({
+        room_id: room.id,
+        channel,
+        type,
+        amount,
+        from_user: from || null,
+      });
+
+    if (insertErr) {
+      console.error("gift insert error:", insertErr);
     }
 
-    const payload = {
-      channel,
-      type,
-      amount,
-      from: from || null,
-      at: new Date().toISOString(),
-    };
+    // 2) increment total_gifts
+    const { error: updateErr } = await supabaseAdmin.rpc(
+      "increment_live_gifts",
+      { p_room_id: room.id, p_amount: amount }
+    );
 
-    // TODO: Persist to DB (for analytics / history), e.g.:
-    // await supabaseAdmin.from("live_gifts").insert(payload);
+    // Agar RPC nahi bana to simple update bhi use kar sakte:
+    // await supabaseAdmin
+    //   .from("live_rooms")
+    //   .update({ total_gifts: (live_rooms.total_gifts ?? 0) + amount })
+    //   .eq("id", room.id);
+
+    if (updateErr) {
+      console.error("gift total_gifts update error:", updateErr);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    console.error("live/gift error:", e);
+    console.error("gift error:", e);
     return NextResponse.json(
       { error: e?.message || "gift error" },
       { status: 500 }

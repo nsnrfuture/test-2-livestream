@@ -1,3 +1,4 @@
+// app/api/live/token/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { RtcTokenBuilder, RtcRole } from "agora-access-token";
 
@@ -17,18 +18,16 @@ export async function POST(req: NextRequest) {
 
     if (!channel || typeof channel !== "string") {
       return NextResponse.json(
-        { error: "channel required" },
+        { error: "channel, uid, role required" },
         { status: 400 }
       );
     }
-
     if (typeof uid !== "number" || Number.isNaN(uid)) {
       return NextResponse.json(
         { error: "uid must be a number" },
         { status: 400 }
       );
     }
-
     if (role !== "host" && role !== "audience") {
       return NextResponse.json(
         { error: "role must be 'host' or 'audience'" },
@@ -37,8 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     const agoraRole = role === "host" ? RtcRole.PUBLISHER : RtcRole.SUBSCRIBER;
-    const privilegeExpireTs =
-      Math.floor(Date.now() / 1000) + TOKEN_TTL;
+    const privilegeExpireTs = Math.floor(Date.now() / 1000) + TOKEN_TTL;
 
     const token = RtcTokenBuilder.buildTokenWithUid(
       APP_ID!,
