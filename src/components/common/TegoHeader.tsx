@@ -117,15 +117,15 @@ export default function TegoHeader() {
 
           {/* PRICING */}
           <Link
-            href="/pricing"
+            href="/earning"
             className={`relative transition ${
-              isActive("/pricing")
+              isActive("/earning")
                 ? "text-white"
                 : "text-white/60 hover:text-white"
             }`}
           >
-            Pricing
-            {isActive("/pricing") && (
+            Earning
+            {isActive("/earning") && (
               <span className="absolute left-0 -bottom-2 h-[3px] w-full rounded-full bg-white transition-all" />
             )}
           </Link>
@@ -232,15 +232,15 @@ export default function TegoHeader() {
 
             {/* PRICING */}
             <Link
-              href="/pricing"
+              href="/earning"
               onClick={() => setOpen(false)}
               className={`py-2 px-3 rounded-lg ${
-                isActive("/pricing")
+                isActive("/earning")
                   ? "bg-white/10 text-white font-semibold"
                   : "hover:bg-white/10"
               }`}
             >
-              Pricing
+              Earning
             </Link>
 
             {/* ABOUT */}
