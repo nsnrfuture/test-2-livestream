@@ -24,8 +24,6 @@ import {
   VideoOff,
   PhoneOff,
   Radio,
-  Copy as CopyIcon,
-  Eye,
   Link2,
   Heart,
 } from "lucide-react";
@@ -241,10 +239,7 @@ function LivePublisher({ channel, onLeave }: LivePublisherProps) {
   return (
     <div className="w-full h-full flex flex-col justify-end">
       {/* Video fills parent */}
-      <div
-        ref={containerRef}
-        className="absolute inset-0 bg-black"
-      >
+      <div ref={containerRef} className="absolute inset-0 bg-black">
         {!joined && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/70">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/5 border border-white/15 shadow-[0_0_30px_rgba(139,61,255,0.6)]">
@@ -252,29 +247,32 @@ function LivePublisher({ channel, onLeave }: LivePublisherProps) {
             </div>
             <p className="text-sm font-medium">You&apos;re currently offline</p>
             <p className="text-xs text-white/40 max-w-xs text-center px-4">
-              Click <span className="font-semibold" style={{ color: ACCENT }}>Go Live</span> to
-              start your stream and preview camera & audio here.
+              Click{" "}
+              <span className="font-semibold" style={{ color: ACCENT }}>
+                Go Live
+              </span>{" "}
+              to start your stream and preview camera & audio here.
             </p>
           </div>
         )}
       </div>
 
-      {/* Controls bottom-left, overlay style */}
+      {/* Controls bottom – BIG button, old location style */}
       <div className="relative z-10 mb-24 ml-4 mr-24">
         {!joined ? (
           <button
             onClick={join}
             disabled={loading || !client}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-linear-to-r from-[#8B3DFF] via-[#6C5CE7] to-[#3B82F6] px-5 py-2.5 text-xs font-semibold text-white shadow-[0_0_30px_rgba(139,61,255,0.7)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-linear-to-r from-[#8B3DFF] via-[#6C5CE7] to-[#3B82F6] px-6 py-3 text-sm sm:text-base font-semibold text-white shadow-[0_0_30px_rgba(139,61,255,0.7)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>
-                <Radio className="h-4 w-4 animate-pulse" />
+                <Radio className="h-5 w-5 animate-pulse" />
                 <span>Starting…</span>
               </>
             ) : (
               <>
-                <Radio className="h-4 w-4" />
+                <Radio className="h-5 w-5" />
                 <span>Go Live</span>
               </>
             )}
@@ -363,6 +361,21 @@ export default function GoOnlinePage() {
     setChannel(null);
   };
 
+  const handleShare = () => {
+    if (!shareUrl) return;
+
+    if (typeof navigator !== "undefined" && (navigator as any).share) {
+      (navigator as any).share({
+        title: title || "Live on Tego",
+        text: "Join my live stream now!",
+        url: shareUrl,
+      });
+    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl);
+      alert("Live link copied to clipboard!");
+    }
+  };
+
   return (
     <main className="min-h-screen w-full bg-linear-to-b from-[#050816] via-[#020617] to-black text-white pt-20 pb-14 px-4">
       {/* Glows */}
@@ -397,7 +410,9 @@ export default function GoOnlinePage() {
             <ul className="space-y-1.5">
               <li className="flex gap-2">
                 <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-[#8B3DFF]" />
-                <span>Use a clear title so viewers know what your live is about.</span>
+                <span>
+                  Use a clear title so viewers know what your live is about.
+                </span>
               </li>
               <li className="flex gap-2">
                 <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-sky-400" />
@@ -428,7 +443,8 @@ export default function GoOnlinePage() {
                   className="w-full rounded-2xl bg-neutral-950/80 backdrop-blur-sm px-4 py-3 text-sm outline-none border border-white/10 focus:border-[#8B3DFF] focus:ring-2 focus:ring-[#8B3DFF]/30 transition-all placeholder:text-white/35"
                 />
                 <p className="mt-1.5 text-[11px] text-white/45">
-                  This helps your followers recognise your session on the viewer page.
+                  This helps your followers recognise your session on the viewer
+                  page.
                 </p>
               </div>
 
@@ -459,13 +475,14 @@ export default function GoOnlinePage() {
 
             {/* Right: preview / info */}
             <div className="space-y-4">
-              <div className="h-full bg-linear-to-br from-white/10 via-white/3 to-black/40 border border-white/15 rounded-3xl p-4 sm:p-5 backdrop-blur-2xl shadow-[0_0_45px_rgba(0,0,0,0.75)] flex flex-col justify-between">
+              <div className="h-full bg-linear-to-br from-white/10 via-white/[0.03] to-black/40 border border-white/15 rounded-3xl p-4 sm:p-5 backdrop-blur-2xl shadow-[0_0_45px_rgba(0,0,0,0.75)] flex flex-col justify-between">
                 <div className="space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/50">
                     Preview
                   </p>
                   <p className="text-sm text-white/75">
-                    Once you start, you&apos;ll see your camera preview here with mic & camera controls.
+                    Once you start, you&apos;ll see your camera preview here
+                    with mic & camera controls.
                   </p>
                   <div className="mt-3 aspect-video w-full rounded-2xl bg-black/60 border border-dashed border-white/15 flex items-center justify-center">
                     <span className="text-[11px] text-white/35">
@@ -508,7 +525,7 @@ export default function GoOnlinePage() {
               <LivePublisher channel={channel} onLeave={endLive} />
               <GiftRain feed={feed} />
 
-              {/* Top overlay: profile + follow */}
+              {/* Top overlay: profile + share + follow */}
               <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20">
                 <div className="bg-black/40 backdrop-blur-xl rounded-2xl px-3 py-2 flex items-center gap-2 border border-white/10">
                   <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-semibold">
@@ -524,9 +541,20 @@ export default function GoOnlinePage() {
                   </div>
                 </div>
 
-                <button className="bg-[#FF2D55] text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg">
-                  Follow
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* Share viewer link - darker now */}
+                  <button
+                    onClick={handleShare}
+                    className="h-9 w-9 flex items-center justify-center rounded-full bg-black/70 border border-white/30 shadow-md backdrop-blur-xl active:scale-95 transition"
+                  >
+                    <Link2 className="h-4 w-4 text-white" />
+                  </button>
+
+                  {/* Follow button */}
+                  <button className="bg-[#FF2D55] text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg">
+                    Follow
+                  </button>
+                </div>
               </div>
 
               {/* Live badge */}
@@ -536,7 +564,7 @@ export default function GoOnlinePage() {
               </div>
 
               {/* Chat messages overlay */}
-              <div className="absolute bottom-88 left-0 w-full px-4 space-y-2 z-20 pointer-events-none">
+              <div className="absolute bottom-32 left-0 w-full px-4 space-y-2 z-20 pointer-events-none">
                 <div className="flex items-start gap-2">
                   <div className="h-7 w-7 rounded-full bg-white/30" />
                   <div className="bg-black/45 backdrop-blur-xl px-3 py-2 rounded-2xl text-white text-xs border border-white/10 max-w-[80%]">
@@ -547,15 +575,15 @@ export default function GoOnlinePage() {
                 <div className="flex items-start gap-2">
                   <div className="h-7 w-7 rounded-full bg-white/30" />
                   <div className="bg-black/45 backdrop-blur-xl px-3 py-2 rounded-2xl text-white text-xs border border-white/10 max-w-[80%]">
-                    <span className="font-medium">Marcltna:</span>{" "}
-                    Hallo, welcome!! 💜
+                    <span className="font-medium">Marcltna:</span> Hallo,
+                    welcome!! 💜
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
                   <div className="h-7 w-7 rounded-full bg-white/30" />
                   <div className="bg-black/45 backdrop-blur-xl px-3 py-2 rounded-2xl text-white text-xs border border-white/10 max-w-[80%]">
-                    <span className="font-medium">Mystic Meadow:</span>{" "}
-                    Your style is perfect 🔥
+                    <span className="font-medium">Mystic Meadow:</span> Your
+                    style is perfect 🔥
                   </div>
                 </div>
               </div>
@@ -570,8 +598,6 @@ export default function GoOnlinePage() {
                   <Heart className="h-5 w-5 text-white" />
                 </button>
               </div>
-
-              {/* Right side small column could be future gift icons etc */}
             </div>
           </div>
         )}
