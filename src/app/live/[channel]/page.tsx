@@ -84,6 +84,7 @@ function giftEmoji(type: string) {
 
 type GiftPanelProps = {
   channel: string;
+  viewerId?: string | null;
   onGift?: (g: GiftEvent) => void;
 };
 
@@ -94,7 +95,7 @@ const GIFTS: { label: string; type: GiftType; amount: number }[] = [
   { label: "Diamond", type: "diamond", amount: 25 },
 ];
 
-function GiftPanel({ channel, onGift }: GiftPanelProps) {
+function GiftPanel({ channel, viewerId, onGift }: GiftPanelProps) {
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
@@ -120,19 +121,30 @@ function GiftPanel({ channel, onGift }: GiftPanelProps) {
 
   const send = useCallback(
     async (type: GiftType, amount: number) => {
+      if (!viewerId) {
+        alert("Please login to send gifts.");
+        return;
+      }
+
+      // Broadcast payload (for UI animations)
       const g: GiftEvent = {
         type,
         amount,
-        from: null,
+        from: viewerId,
         channel,
         at: new Date().toISOString(),
       };
 
-      // Optional: server-side logging
+      // Server-side logging (sender id + host info etc.)
       fetch("/api/live/gift", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(g),
+        body: JSON.stringify({
+          channel,
+          type,
+          amount,
+          fromUserId: viewerId,
+        }),
       }).catch(() => {});
 
       // Broadcast so all viewers & host see it instantly
@@ -140,12 +152,12 @@ function GiftPanel({ channel, onGift }: GiftPanelProps) {
         .channel(`live:${channel}`, { config: { broadcast: { self: true } } })
         .send({ type: "broadcast", event: "gift", payload: g });
     },
-    [channel]
+    [channel, viewerId]
   );
 
   return (
     <div className="mt-6 flex flex-col items-center gap-3 text-white">
-      {/* Gift Total pill – matches "Gift Total: 12" */}
+      {/* Gift Total pill */}
       <div className="inline-flex items-center gap-2 rounded-full bg-black/60 px-4 py-1 border border-white/10 backdrop-blur-xl text-xs sm:text-sm">
         <span className="text-[11px] uppercase tracking-[0.18em] text-white/50">
           Gifts
@@ -280,17 +292,47 @@ export default function ViewerPage() {
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const SWIPE_THRESHOLD = 60; // px
 
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const [viewerEmail, setViewerEmail] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Load current logged-in viewer
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (!active) return;
+      if (error) {
+        console.error("viewer getUser error:", error);
+        setAuthLoading(false);
+        return;
+      }
+      const u = data.user;
+      if (u) {
+        setViewerId(u.id);
+        setViewerEmail((u.email as string) || null);
+      }
+      setAuthLoading(false);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // 🔹 Track viewer on mount / channel change
   useEffect(() => {
     if (!channel) return;
 
-    // TODO: viewerId = supabase auth se la sakte ho
     fetch("/api/live/view", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel, viewerId: null }),
+      body: JSON.stringify({
+        channel,
+        viewerId: viewerId || null,
+      }),
     }).catch(() => {});
-  }, [channel]);
+  }, [channel, viewerId]);
 
   if (!channel) {
     return (
@@ -488,6 +530,7 @@ export default function ViewerPage() {
         <div className="flex justify-center">
           <GiftPanel
             channel={channel}
+            viewerId={viewerId}
             onGift={(g) => setFeed((f) => [...f, g].slice(-20))}
           />
         </div>

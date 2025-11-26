@@ -16,6 +16,7 @@ import type {
 } from "agora-rtc-sdk-ng";
 import { AGORA_APP_ID, randomUid } from "@/lib/agora";
 import type { GiftEvent } from "@/types/live";
+import { supabase } from "@/lib/supabaseClient";
 
 import {
   Mic,
@@ -93,10 +94,11 @@ function giftEmoji(type: string) {
 
 type LivePublisherProps = {
   channel: string;
+  hostId: string;
   onLeave?: () => void;
 };
 
-function LivePublisher({ channel, onLeave }: LivePublisherProps) {
+function LivePublisher({ channel, hostId, onLeave }: LivePublisherProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [client, setClient] = useState<IAgoraRTCClient | null>(null);
@@ -127,12 +129,12 @@ function LivePublisher({ channel, onLeave }: LivePublisherProps) {
     const res = await fetch("/api/live/token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel, uid, role: "host" }),
+      body: JSON.stringify({ channel, uid, role: "host", hostId }),
     });
     const j = await res.json();
     if (!res.ok) throw new Error(j?.error || "token");
     return j.token as string;
-  }, [channel, uid]);
+  }, [channel, uid, hostId]);
 
   const join = useCallback(async () => {
     if (!client) return;
@@ -333,7 +335,34 @@ export default function GoOnlinePage() {
   const [title, setTitle] = useState("");
   const [channel, setChannel] = useState<string | null>(null);
   const [feed, setFeed] = useState<GiftEvent[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const router = useRouter();
+
+  // Load current logged-in user
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (!active) return;
+      if (error) {
+        console.error("go-online getUser error:", error);
+        setAuthLoading(false);
+        return;
+      }
+      const u = data.user;
+      if (u) {
+        setUserId(u.id);
+        setUserEmail((u.email as string) || null);
+      }
+      setAuthLoading(false);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const shareUrl = useMemo(() => {
     if (!channel) return "";
@@ -343,10 +372,15 @@ export default function GoOnlinePage() {
   }, [channel]);
 
   const startLive = async () => {
+    if (!userId) {
+      alert("Please login to start live.");
+      return;
+    }
+
     const res = await fetch("/api/live/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, hostId: userId }),
     });
     const j = await res.json();
     if (!res.ok) {
@@ -358,12 +392,15 @@ export default function GoOnlinePage() {
 
   const endLive = async () => {
     if (!channel) return;
-    await fetch("/api/live/stop", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel }),
-    }).catch(() => {});
-    setChannel(null);
+    try {
+      await fetch("/api/live/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel, hostId: userId }),
+      }).catch(() => {});
+    } finally {
+      setChannel(null);
+    }
   };
 
   const handleShare = () => {
@@ -410,7 +447,7 @@ export default function GoOnlinePage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 sm:px-5 sm:py-4 text-xs sm:text-sm text-white/70 backdrop-blur-xl shadow-[0_0_35px_rgba(0,0,0,0.55)] max-w-xs">
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 sm:px-5 sm:py-4 text-xs sm:text-sm text.white/70 backdrop-blur-xl shadow-[0_0_35px_rgba(0,0,0,0.55)] max-w-xs">
             <p className="font-semibold text-white/80 mb-1">Host Tips</p>
             <ul className="space-y-1.5">
               <li className="flex gap-2">
@@ -455,7 +492,7 @@ export default function GoOnlinePage() {
 
               <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2 text-xs text-white/60">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/40 border border-white/10">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/40 border border.white/10">
                     <Radio className="h-3.5 w-3.5" style={{ color: ACCENT }} />
                   </span>
                   <div className="flex flex-col">
@@ -470,10 +507,17 @@ export default function GoOnlinePage() {
 
                 <button
                   onClick={startLive}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-linear-to-r from-[#8B3DFF] via-[#6C5CE7] to-[#3B82F6] px-6 py-3 text-sm sm:text-base font-semibold text-white shadow-[0_0_45px_rgba(139,61,255,0.7)] hover:shadow-[0_0_60px_rgba(139,61,255,0.9)] hover:scale-[1.03] active:scale-95 transition-all"
+                  disabled={authLoading || !userId}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-linear-to-r from-[#8B3DFF] via-[#6C5CE7] to-[#3B82F6] px-6 py-3 text-sm sm:text-base font-semibold text-white shadow-[0_0_45px_rgba(139,61,255,0.7)] hover:shadow-[0_0_60px_rgba(139,61,255,0.9)] hover:scale-[1.03] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Radio className="h-4 w-4" />
-                  <span>Start Live Session</span>
+                  <span>
+                    {authLoading
+                      ? "Checking account..."
+                      : userId
+                      ? "Start Live Session"
+                      : "Login required"}
+                  </span>
                 </button>
               </div>
             </div>
@@ -524,16 +568,18 @@ export default function GoOnlinePage() {
           </div>
         ) : (
           // AFTER STARTING LIVE – vertical video with chat overlay
-          <div className="flex justify-center">
+          <div className="flex justify.center">
             <div className="relative w-full max-w-md h-[calc(100vh-130px)] bg-black rounded-3xl overflow-hidden shadow-2xl border border-white/10">
               {/* Video + controls handled inside */}
-              <LivePublisher channel={channel} onLeave={endLive} />
+              {userId && (
+                <LivePublisher channel={channel} hostId={userId} onLeave={endLive} />
+              )}
               <GiftRain feed={feed} />
 
               {/* Top overlay: profile + share + follow */}
               <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20">
                 <div className="bg-black/40 backdrop-blur-xl rounded-2xl px-3 py-2 flex items-center gap-2 border border-white/10">
-                  <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-semibold">
+                  <div className="h-8 w-8 rounded-full bg.white/20 flex items-center justify-center text-xs font-semibold">
                     U
                   </div>
                   <div className="flex flex-col leading-tight">
@@ -563,7 +609,7 @@ export default function GoOnlinePage() {
               </div>
 
               {/* Live badge */}
-              <div className="absolute top-20 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-1 shadow-lg z-20">
+              <div className="absolute top-20 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex.items-center gap-1 shadow-lg z-20">
                 <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
                 LIVE • 2.3k
               </div>
@@ -571,22 +617,22 @@ export default function GoOnlinePage() {
               {/* Chat messages overlay */}
               <div className="absolute bottom-32 left-0 w-full px-4 space-y-2 z-20 pointer-events-none">
                 <div className="flex items-start gap-2">
-                  <div className="h-7 w-7 rounded-full bg-white/30" />
-                  <div className="bg-black/45 backdrop-blur-xl px-3 py-2 rounded-2xl text-white text-xs border border-white/10 max-w-[80%]">
+                  <div className="h-7 w-7 rounded-full bg.white/30" />
+                  <div className="bg-black/45 backdrop-blur-xl px-3 py-2 rounded-2xl text-white text-xs border border.white/10 max-w-[80%]">
                     <span className="font-medium">Radiant Rose:</span>{" "}
                     Minimalist and high quality ✨
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <div className="h-7 w-7 rounded-full bg-white/30" />
-                  <div className="bg-black/45 backdrop-blur-xl px-3 py-2 rounded-2xl text-white text-xs border border-white/10 max-w-[80%]">
+                  <div className="h-7 w-7 rounded-full bg.white/30" />
+                  <div className="bg-black/45 backdrop-blur-xl px-3 py-2 rounded-2xl text-white text-xs border border.white/10 max-w-[80%]">
                     <span className="font-medium">Marcltna:</span> Hallo,
                     welcome!! 💜
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <div className="h-7 w-7 rounded-full bg-white/30" />
-                  <div className="bg-black/45 backdrop-blur-xl px-3 py-2 rounded-2xl text-white text-xs border border-white/10 max-w-[80%]">
+                  <div className="h-7 w-7 rounded-full bg.white/30" />
+                  <div className="bg-black/45 backdrop-blur-xl px-3 py-2 rounded-2xl text-white text-xs border border.white/10 max-w-[80%]">
                     <span className="font-medium">Mystic Meadow:</span> Your
                     style is perfect 🔥
                   </div>
@@ -597,7 +643,7 @@ export default function GoOnlinePage() {
               <div className="absolute bottom-4 left-0 right-0 px-4 flex items-center gap-3 z-30">
                 <input
                   placeholder="Message..."
-                  className="flex-1 bg-black/50 backdrop-blur-xl px-4 py-3 text-sm text-white rounded-full border border-white/15 outline-none placeholder:text-white/40"
+                  className="flex-1 bg-black/50 backdrop-blur-xl px-4 py-3 text-sm text-white rounded-full border border.white/15 outline-none placeholder:text-white/40"
                 />
                 <button className="h-11 w-11 flex items-center justify-center rounded-full bg-[#FF2D55] shadow-xl">
                   <Heart className="h-5 w-5 text-white" />

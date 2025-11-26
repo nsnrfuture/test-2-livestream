@@ -6,7 +6,14 @@ export async function POST(req: NextRequest) {
   try {
     const { title, hostId } = await req.json();
 
-    // Channel generate
+    if (!hostId) {
+      return NextResponse.json(
+        { error: "hostId is required" },
+        { status: 400 }
+      );
+    }
+
+    // 👉 Channel generate
     const slug =
       title
         ?.toLowerCase()
@@ -16,14 +23,32 @@ export async function POST(req: NextRequest) {
 
     const channel = `${slug}_${Math.random().toString(36).slice(2, 8)}`;
 
-    // DB me room insert
-    const { error } = await supabaseAdmin.from("live_rooms").insert({
-      channel,
-      title: title || null,
-      host_id: hostId || null, // TODO: isko auth se wire kar sakte ho
-      is_live: true,
-      started_at: new Date().toISOString(),
-    });
+    // 👉 host ka name + email profiles se nikaalo
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, email")
+      .eq("id", hostId)
+      .single();
+
+    if (profileError) {
+      console.warn("profile load error in /live/start:", profileError);
+      // yaha hard fail nahi kar rahe, sirf log — insert fir bhi chalega
+    }
+
+    // 👉 DB me room insert
+    const { data: inserted, error } = await supabaseAdmin
+      .from("live_rooms")
+      .insert({
+        channel,
+        title: title || null,
+        host_id: hostId, // already tha
+        host_name: profile?.full_name || null, // ✅ naya
+        host_email: profile?.email || null, // ✅ naya
+        is_live: true,
+        started_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
 
     if (error) {
       console.error("live/start insert error:", error);
@@ -33,7 +58,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ channel });
+    return NextResponse.json({
+      channel,
+      roomId: inserted.id,
+      host: {
+        id: hostId,
+        name: profile?.full_name || null,
+        email: profile?.email || null,
+      },
+    });
   } catch (e: any) {
     console.error("live/start error:", e);
     return NextResponse.json(

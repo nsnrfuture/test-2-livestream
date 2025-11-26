@@ -223,7 +223,7 @@ export default function TegoWallet({ userId }: Props) {
       {/* Main stats cards */}
       <div className="grid gap-4 md:grid-cols-3">
         {/* Balance */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#050816] via-[#020617] to-black p-4 ring-1 ring-white/10">
+        <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-[#050816] via-[#020617] to-black p-4 ring-1 ring-white/10">
           <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-[rgba(139,61,255,0.35)] blur-2xl" />
           <div className="flex items-center justify-between">
             <span className="text-xs text-zinc-400">Current Balance</span>
@@ -474,7 +474,7 @@ export default function TegoWallet({ userId }: Props) {
                       {task.title}
                     </p>
                     {isClaimed && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-[2px] text-[10px] text-emerald-300">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300">
                         <CheckCircle2 className="h-3 w-3" />
                         Claimed
                       </span>
