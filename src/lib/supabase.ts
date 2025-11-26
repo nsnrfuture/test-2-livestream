@@ -1,26 +1,14 @@
-// src/lib/supabase.ts
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+// lib/supabase.ts
+import { createClient } from "@supabase/supabase-js";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-if (!url || !anonKey) {
-  // Throwing here helps catch missing envs early during dev/build.
-  throw new Error(
-    "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in environment."
-  );
-}
-
-/**
- * Export a single Supabase client for use in client-side components.
- * This client is safe to use in the browser (uses the anon key).
- */
-export const supabase: SupabaseClient = createClient(url, anonKey, {
-  // optional: tune realtime params
-  realtime: {
-    // If you want to receive presence events or listen across tabs,
-    // add params here. Keep defaults for most cases.
+// 👉 Ye WALI file sirf "use client" components me import karna
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
   },
-  // You can add global headers here if required:
-  // global: { headers: { "x-my-app": "my-app" } }
 });

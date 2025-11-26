@@ -25,7 +25,6 @@ export default function TegoHeader() {
 
   const isActive = (path: string) => pathname === path;
 
-  // 👇 Decide what to show as display name
   const displayName = useMemo(() => {
     const name = user?.user_metadata?.full_name?.trim();
     if (name) return name;
@@ -33,7 +32,7 @@ export default function TegoHeader() {
     return "Profile";
   }, [user]);
 
-  /* ---------------- Auth listener (Supabase) ---------------- */
+  // ---------------- Auth listener ----------------
   useEffect(() => {
     let cancelled = false;
 
@@ -42,9 +41,7 @@ export default function TegoHeader() {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        if (!cancelled) {
-          setUser(user as SupaUser | null);
-        }
+        if (!cancelled) setUser(user as SupaUser | null);
       } catch (err) {
         console.error("Error loading user", err);
       } finally {
@@ -66,7 +63,7 @@ export default function TegoHeader() {
     };
   }, []);
 
-  /* ---------------- Logout handler ---------------- */
+  // ---------------- Logout handler ----------------
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -115,7 +112,7 @@ export default function TegoHeader() {
             )}
           </Link>
 
-          {/* PRICING */}
+          {/* EARNING */}
           <Link
             href="/earning"
             className={`relative transition ${
@@ -148,14 +145,25 @@ export default function TegoHeader() {
 
         {/* RIGHT SIDE CTA */}
         <div className="flex items-center gap-3">
-          {/* Go Online (only show when logged in) */}
+          {/* Wallet + Go Online (only when logged in) */}
           {user && (
-            <Link
-              href="/go-online"
-              className="hidden sm:inline-flex items-center justify-center rounded-full bg-emerald-400 px-4 py-2 text-sm font-semibold text-black shadow hover:bg-emerald-300 transition"
-            >
-              Go Online
-            </Link>
+            <>
+              {/* ⭐ WALLET BUTTON */}
+              <Link
+                href="/wallet"
+                className="hidden sm:inline-flex items-center justify-center rounded-full bg-[rgba(139,61,255,1)] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[rgba(139,61,255,0.9)] transition"
+              >
+                Wallet
+              </Link>
+
+              {/* Go Online */}
+              <Link
+                href="/go-online"
+                className="hidden sm:inline-flex items-center justify-center rounded-full bg-emerald-400 px-4 py-2 text-sm font-semibold text-black shadow hover:bg-emerald-300 transition"
+              >
+                Go Online
+              </Link>
+            </>
           )}
 
           {/* If still loading auth */}
@@ -168,8 +176,8 @@ export default function TegoHeader() {
             <>
               <button
                 type="button"
-                onClick={() => router.push("/profile")} // 👈 click -> profile
-                className="hidden sm:flex items-center justify-center h-10 rounded-full bg-white/10 border border-white/20 px-3 text-xs text-white/80 max-w-40 truncate"
+                onClick={() => router.push("/profile")}
+                className="hidden lg:flex items-center justify-center h-10 rounded-full bg-white/10 border border-white/20 px-3 text-xs text-white/80 max-w-40 truncate"
               >
                 <User2 className="h-4 w-4 mr-1.5" />
                 <span className="truncate">{displayName}</span>
@@ -230,7 +238,7 @@ export default function TegoHeader() {
               Video Chat
             </Link>
 
-            {/* PRICING */}
+            {/* EARNING */}
             <Link
               href="/earning"
               onClick={() => setOpen(false)}
@@ -241,6 +249,15 @@ export default function TegoHeader() {
               }`}
             >
               Earning
+            </Link>
+
+            {/* ⭐ WALLET (MOBILE BUTTON STYLE) */}
+            <Link
+              href="/wallet"
+              onClick={() => setOpen(false)}
+              className="py-2 px-3 rounded-lg bg-[rgba(139,61,255,1)] text-white font-semibold text-sm text-center"
+            >
+              Wallet
             </Link>
 
             {/* ABOUT */}
@@ -256,7 +273,7 @@ export default function TegoHeader() {
               About
             </Link>
 
-            {/* If logged in: Go Online, History, Profile (with name/email), Logout */}
+            {/* If logged in: Go Online, History, Profile, Logout */}
             {user ? (
               <>
                 <Link
@@ -279,7 +296,7 @@ export default function TegoHeader() {
                   type="button"
                   onClick={() => {
                     setOpen(false);
-                    router.push("/profile"); // 👈 mobile: profile redirect
+                    router.push("/profile");
                   }}
                   className="flex items-center gap-2 py-2 px-3 bg-white/10 rounded-lg"
                 >
@@ -295,7 +312,6 @@ export default function TegoHeader() {
                 </button>
               </>
             ) : (
-              /* If logged OUT in mobile */
               <>
                 <Link
                   href="/login"
