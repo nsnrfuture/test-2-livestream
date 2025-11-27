@@ -28,6 +28,7 @@ import {
   Wifi,
   SkipForward,
   Dot,
+  X,
 } from "lucide-react";
 
 type Facing = "user" | "environment";
@@ -44,6 +45,76 @@ let AgoraRTC: any | null = null;
 function randomAgoraUid() {
   return Math.floor(Math.random() * 2147483647) + 1;
 }
+
+/* ---------------------- Rating Popup Component ---------------------- */
+
+type RatingPopupProps = {
+  open: boolean;
+  currentRating: number | null;
+  onRate: (star: number) => void;
+  onClose: () => void;
+};
+
+function RatingPopup({ open, currentRating, onRate, onClose }: RatingPopupProps) {
+  if (!open) return null;
+
+  const handleRate = (star: number) => {
+    onRate(star);
+    onClose(); // user ne rating de di => popup band
+  };
+
+  return (
+    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="relative w-[90%] max-w-xs rounded-2xl bg-[#050816]/95 border border-white/10 px-4 py-5 shadow-2xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-2 top-2 p-1 rounded-full hover:bg-white/10 text-white/70"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="flex flex-col items-center gap-3 mt-2">
+          <span className="text-xs uppercase tracking-[0.18em] text-teal-300/80">
+            Quick Feedback
+          </span>
+          <h3 className="text-sm font-semibold text-white text-center">
+            Rate this chat experience
+          </h3>
+          <p className="text-[11px] text-white/60 text-center">
+            Ye rating aapka next match experience improve karne ke liye hai.
+          </p>
+
+          <div className="mt-2 flex gap-2">
+            {[1, 2, 3, 4, 5].map((star) => {
+              const active = currentRating !== null && star <= currentRating;
+              return (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => handleRate(star)}
+                  className={`h-8 w-8 rounded-full text-sm flex items-center justify-center border transition-transform ${
+                    active
+                      ? "bg-yellow-400 text-black border-yellow-300 scale-105"
+                      : "bg-black/60 text-white/70 border-white/20 hover:bg-white/10 hover:scale-105"
+                  }`}
+                >
+                  ★
+                </button>
+              );
+            })}
+          </div>
+
+          <span className="mt-1 text-[10px] text-white/50">
+            Tap any star to submit
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* --------------------------- Main Component -------------------------- */
 
 export default function VideoCall({
   getToken,
@@ -91,6 +162,9 @@ export default function VideoCall({
   // ⭐ Stranger rating + note
   const [strangerRating, setStrangerRating] = useState<number | null>(null);
   const [strangerNote, setStrangerNote] = useState<string>("");
+
+  // ⭐ Popup visibility
+  const [showRatingPopup, setShowRatingPopup] = useState(false);
 
   useEffect(() => {
     videoEnabledRef.current = videoEnabled;
@@ -374,6 +448,7 @@ export default function VideoCall({
         sessionStartRef.current = null;
         setStrangerRating(null);
         setStrangerNote("");
+        setShowRatingPopup(false);
       }
     },
     [channel, joinedChannel, strangerRating, strangerNote, userId]
@@ -521,6 +596,10 @@ export default function VideoCall({
 
         // ⏱ call start time
         sessionStartRef.current = new Date().toISOString();
+
+        // naya match start -> rating reset + popup ko band rakho
+        setStrangerRating(null);
+        setShowRatingPopup(false);
 
         await openSession({ channel: ch, agoraUid: u, startReason: "join" });
       } catch (err: any) {
@@ -774,6 +853,18 @@ export default function VideoCall({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, userId]);
 
+  /* --------- Mid-call rating popup trigger (e.g. 20s after join) -------- */
+
+  useEffect(() => {
+    // Jab bhi naya channel join hota hai, thodi der baad popup dikhao
+    if (!joinedChannel) return;
+    const timeout = setTimeout(() => {
+      setShowRatingPopup(true);
+    }, 20_000); // 20 seconds ke baad popup
+
+    return () => clearTimeout(timeout);
+  }, [joinedChannel]);
+
   /* ---------------------- Simple toggles + UI data ---------------------- */
 
   const toggleVideo = async (enable: boolean) => {
@@ -821,6 +912,14 @@ export default function VideoCall({
           shadow-[0_20px_60px_-20px_rgba(108,92,231,0.35)]
         "
       >
+        {/* Rating Popup */}
+        <RatingPopup
+          open={showRatingPopup}
+          currentRating={strangerRating}
+          onRate={(star) => setStrangerRating(star)}
+          onClose={() => setShowRatingPopup(false)}
+        />
+
         {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 sm:px-4 py-2">
           <div className="flex flex-col items-start gap-1">
@@ -911,29 +1010,8 @@ export default function VideoCall({
           </div>
         </div>
 
-        {/* Right side controls (Rating / Skip / Next / Mic / Cam) */}
+        {/* Right side controls (Skip / Next / Mic / Cam) */}
         <div className="absolute right-3 sm:right-4 bottom-28 md:bottom-8 z-30 flex flex-col items-center gap-3">
-          {/* ⭐ Rating – top of column */}
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-[10px] text-white/70">Rate this chat</span>
-            <div className="flex gap-1">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setStrangerRating(star)}
-                  className={`h-6 w-6 rounded-full text-xs flex items-center justify-center border transition-colors ${
-                    strangerRating !== null && star <= strangerRating
-                      ? "bg-yellow-400 text-black border-yellow-300"
-                      : "bg-black/40 text-white/70 border-white/20 hover:bg-white/10"
-                  }`}
-                >
-                  ★
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Skip / Next buttons */}
           <>
             <RoundBtn
