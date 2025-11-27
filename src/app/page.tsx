@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import {
-  Maximize2,
-  Sparkles,
-  Smile,
-  ChevronDown,
-} from "lucide-react";
+import { Maximize2, Sparkles, Smile, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { Status } from "@/components/ACCENT";
 import { supabase } from "@/lib/supabaseClient";
@@ -56,11 +51,15 @@ const people = [
   },
 ];
 
-const features = [
-  { icon: Maximize2, label: "HD Video Quality", description: "Crystal clear video calls" },
-  { icon: Sparkles, label: "Fun Effects", description: "Add playful vibes to chats" },
-  { icon: Smile, label: "Real People", description: "Verified users worldwide" },
-  { icon: ChevronDown, label: "Smart Filters", description: "Match by interest & region" },
+type PreferredGender = "male" | "female" | "any";
+
+const COUNTRY_OPTIONS = [
+  { code: "world", label: "🌍 World" },
+  { code: "IN", label: "🇮🇳 India" },
+  { code: "US", label: "🇺🇸 United States" },
+  { code: "GB", label: "🇬🇧 United Kingdom" },
+  { code: "BR", label: "🇧🇷 Brazil" },
+  { code: "KR", label: "🇰🇷 South Korea" },
 ];
 
 function statusLabel(status: Status) {
@@ -88,6 +87,11 @@ export default function HomePage() {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // filters
+  const [preferredGender, setPreferredGender] =
+    useState<PreferredGender>("any");
+  const [selectedCountry, setSelectedCountry] = useState<string>("world");
+
   // Unique uid for matching API
   const uid = useMemo(() => Math.floor(Math.random() * 10_000_000), []);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -99,17 +103,6 @@ export default function HomePage() {
       pollTimer.current = null;
     }
   };
-
-  // ❌ OLD PROTECT PAGE useEffect HATA DIYA
-  // useEffect(() => {
-  //   async function checkAuth() {
-  //     const { data } = await supabase.auth.getUser();
-  //     if (!data?.user) {
-  //       router.push("/auth");
-  //     }
-  //   }
-  //   checkAuth();
-  // }, [router]);
 
   const pollOnce = useCallback(async () => {
     try {
@@ -143,7 +136,6 @@ export default function HomePage() {
     clearPoll();
     setErrorMsg(null);
 
-    // ✅ CLICK PAR AUTH CHECK
     const { data, error } = await supabase.auth.getUser();
 
     if (error) {
@@ -151,18 +143,21 @@ export default function HomePage() {
     }
 
     if (!data?.user) {
-      // user NOT logged in → auth page
       router.push("/signup");
       return;
     }
 
-    // user logged in → proceed with pairing
     setStatus("pairing");
     try {
       const res = await fetch("/api/match", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ uid }),
+        body: JSON.stringify({
+          uid,
+          userId: data.user.id,
+          preferredGender,
+          selectedCountry,
+        }),
       });
       const dataRes = await res.json();
 
@@ -184,7 +179,7 @@ export default function HomePage() {
       setStatus("error");
       setErrorMsg(e?.message || "Network error. Please try again.");
     }
-  }, [pollOnce, router, uid]);
+  }, [pollOnce, router, uid, preferredGender, selectedCountry]);
 
   // Camera + fake online count
   useEffect(() => {
@@ -207,7 +202,6 @@ export default function HomePage() {
 
     enableCam();
 
-    // Simulate online count updates
     const interval = setInterval(() => {
       setOnlineCount((prev) => prev + Math.floor(Math.random() * 10 - 5));
     }, 3000);
@@ -224,7 +218,6 @@ export default function HomePage() {
 
   const isBusy = status === "pairing" || status === "waiting";
 
-  // All avatar circle gradients tuned to TEGO theme
   const gradientColors = [
     "from-[#8B3DFF] to-[#4F46E5]",
     "from-[#4F46E5] to-[#22C55E]",
@@ -263,7 +256,8 @@ export default function HomePage() {
               Meet New People Instantly
             </h2>
             <p className="text-lg md:text-xl text-[#E5E7EB]/80 max-w-2xl mx-auto">
-              Start random video chats with strangers from around the world. Safe, fun, and completely free.
+              Start random video chats with strangers from around the world.
+              Safe, fun, and completely free.
             </p>
           </div>
 
@@ -271,10 +265,8 @@ export default function HomePage() {
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] mb-12">
             {/* LEFT PANEL - Video Preview */}
             <div className="relative bg-linear-to-br from-[#020617] via-[#020617] to-[#020617] rounded-3xl overflow-hidden border border-[#4F46E5]/40 shadow-2xl shadow-[#4F46E533] min-h-[500px] md:min-h-[600px]">
-              {/* Subtle overlay */}
               <div className="absolute inset-0 bg-linear-to-tr from-[#8B3DFF0F] via-transparent to-[#22C55E1A] pointer-events-none" />
 
-              {/* Live Camera Preview */}
               <video
                 ref={videoRef}
                 autoPlay
@@ -301,23 +293,109 @@ export default function HomePage() {
               </div>
 
               {/* Bottom Filters + Start */}
-              <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-4 px-4 z-10">
-                {/* Filters (UI only for now) */}
-                <div className="flex w-full justify-center gap-3 max-w-xl flex-wrap">
-                  <button className="flex items-center gap-2 rounded-2xl bg-black/50 backdrop-blur-xl px-5 py-3 text-sm font-medium border border-[#8B3DFF66] shadow-lg hover:bg-[#111827] hover:border-[#8B3DFFAA] transition-all duration-300">
-                    <span className="text-lg">⚧</span>
-                    <span className="text-[#E5E7EB]">Gender</span>
-                    <ChevronDown className="h-4 w-4 text-[#C7D2FE]" />
-                  </button>
+              <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-5 px-4 z-10">
+                {/* FILTERS WRAPPER */}
+                <div className="flex w-full flex-col gap-3 max-w-xl">
+                  {/* Gender pills */}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs uppercase tracking-[0.22em] text-white/40">
+                      Gender
+                    </span>
+                    <div className="flex bg-black/50 backdrop-blur-xl rounded-2xl p-1 border border-white/5 shadow-lg shadow-black/40">
+                      {[
+                        { value: "any", label: "Any" },
+                        { value: "male", label: "Male" },
+                        { value: "female", label: "Female" },
+                      ].map((opt) => {
+                        const active = preferredGender === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() =>
+                              setPreferredGender(opt.value as PreferredGender)
+                            }
+                            className={`px-4 py-1.5 text-xs md:text-sm font-medium rounded-xl transition-all duration-200
+                              ${
+                                active
+                                  ? "bg-linear-to-r from-[#8B3DFF] to-[#4F46E5] text-white shadow-md shadow-[#4F46E580]"
+                                  : "text-white/60 hover:text-white hover:bg-white/5"
+                              }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-                  <button className="flex items-center gap-2 rounded-2xl bg-black/50 backdrop-blur-xl px-5 py-3 text-sm font-medium border border-[#22C55E66] shadow-lg hover:bg-[#022C22] hover:border-[#22C55EAA] transition-all duration-300">
-                    <span className="text-lg">🌎</span>
-                    <span className="text-[#E5E7EB]">Country</span>
-                    <ChevronDown className="h-4 w-4 text-[#6EE7B7]" />
-                  </button>
+                  {/* Country card – improved design */}
+                  <div className="flex items-stretch justify-between gap-3">
+                    <div className="flex flex-col justify-center">
+                      <span className="text-xs uppercase tracking-[0.22em] text-white/40">
+                        Country
+                      </span>
+                      <span className="mt-1 text-[11px] text-white/45">
+                        Choose where your next match comes from.
+                      </span>
+                    </div>
+
+                    <div className="relative w-60">
+                      <div className="absolute -inset-px rounded-2xl bg-linear-to-r from-[#22C55E66] via-[#8B3DFF66] to-transparent opacity-60 blur-[6px]" />
+                      <button
+                        type="button"
+                        className="relative flex w-full items-center justify-between gap-2 rounded-2xl bg-black/60 backdrop-blur-2xl px-4 py-2.5 text-sm border border-white/10 hover:border-[#22C55E99] shadow-xl shadow-black/60 transition-all duration-200"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/5 border border-white/10 text-base">
+                            {
+                              COUNTRY_OPTIONS.find(
+                                (c) => c.code === selectedCountry
+                              )?.label.split(" ")[0]
+                            }
+                          </span>
+                          <div className="flex flex-col">
+                            <span className="text-[#E5E7EB] text-xs uppercase tracking-[0.16em]">
+                              {selectedCountry === "world"
+                                ? "Worldwide"
+                                : "Specific region"}
+                            </span>
+                            <span className="text-[13px] text-white font-medium">
+                              {COUNTRY_OPTIONS.find(
+                                (c) => c.code === selectedCountry
+                              )
+                                ?.label.split(" ")
+                                .slice(1)
+                                .join(" ")}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="hidden md:inline-block rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/40">
+                            Smart match
+                          </span>
+                          <ChevronDown className="h-4 w-4 text-[#6EE7B7]" />
+                        </div>
+                      </button>
+
+                      {/* native select overlay */}
+                      {/* native select overlay */}
+                      <select
+                        value={selectedCountry}
+                        onChange={(e) => setSelectedCountry(e.target.value)}
+                        className="absolute inset-0 cursor-pointer rounded-2xl bg-[#020617] text-white/90 border-none opacity-0 scheme-dark"
+                      >
+                        {COUNTRY_OPTIONS.map((c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Start Button – now uses pairing logic + auth check */}
+                {/* Start Button – pairing logic + auth check */}
                 <div className="flex flex-col items-center gap-2">
                   <button
                     className={`group flex items-center justify-center gap-3 rounded-2xl px-10 py-4 font-bold text-base shadow-2xl hover:shadow-[#4F46E5DD] transition-all duration-300 ${
@@ -346,7 +424,8 @@ export default function HomePage() {
                   </button>
 
                   <p className="text-xs text-white/70">
-                    Status: <span className="font-medium">{statusLabel(status)}</span>
+                    Status:{" "}
+                    <span className="font-medium">{statusLabel(status)}</span>
                   </p>
                   {errorMsg && (
                     <p className="text-xs text-red-300 text-center max-w-xs">
@@ -364,7 +443,6 @@ export default function HomePage() {
                   key={p.id}
                   className="group relative rounded-2xl overflow-hidden bg-linear-to-br from-[#020617] to-[#020617] border border-[#4F46E5]/30 hover:border-[#8B3DFF]/60 shadow-lg hover:shadow-[#4F46E566] flex flex-col justify-end min-h-[200px] transition-all duration-300 hover:scale-[1.02] cursor-pointer"
                 >
-                  {/* Online Badge */}
                   <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-1.5 border border-[#22C55E88] z-10">
                     <span className="h-2 w-2 rounded-full bg-[#22C55E] animate-pulse shadow-lg shadow-[#22C55E99]" />
                     <span className="text-[10px] uppercase tracking-[0.16em] text-[#BBF7D0] font-semibold">
