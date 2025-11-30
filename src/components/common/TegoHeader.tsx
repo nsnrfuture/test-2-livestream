@@ -251,15 +251,6 @@ export default function TegoHeader() {
               Earning
             </Link>
 
-            {/* ⭐ WALLET (MOBILE BUTTON STYLE) */}
-            <Link
-              href="/wallet"
-              onClick={() => setOpen(false)}
-              className="py-2 px-3 rounded-lg bg-[rgba(139,61,255,1)] text-white font-semibold text-sm text-center"
-            >
-              Wallet
-            </Link>
-
             {/* ABOUT */}
             <Link
               href="/about"
@@ -273,9 +264,18 @@ export default function TegoHeader() {
               About
             </Link>
 
-            {/* If logged in: Go Online, History, Profile, Logout */}
+            {/* If logged in: Wallet, Go Online, History, Profile, Logout */}
             {user ? (
               <>
+                {/* ⭐ WALLET ABOVE GO ONLINE (MOBILE) */}
+                <Link
+                  href="/wallet"
+                  onClick={() => setOpen(false)}
+                  className="py-2 px-3 rounded-lg bg-[rgba(139,61,255,1)] text-white font-semibold text-sm text-center"
+                >
+                  Wallet
+                </Link>
+
                 <Link
                   href="/go-online"
                   onClick={() => setOpen(false)}
