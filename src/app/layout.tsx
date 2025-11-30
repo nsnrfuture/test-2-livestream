@@ -145,6 +145,7 @@ export default function RootLayout({
           gtag('config', 'AW-17765380641');
         `}
       </Script>
+      
 
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#111] text-white`}

@@ -14,6 +14,8 @@ import type {
 
 import { AGORA_APP_ID } from "@/lib/agora";
 import { supabase } from "@/lib/supabaseClient";
+import { DisplayAdResponsive, InFeedAd, MultiplexAd } from "@/components/ads/AdSlots";
+// import SelfPromoAd from "@/components/ads/SelfPromoAd";
 
 import {
   Camera,
@@ -194,6 +196,12 @@ function ReportPopup({
               </p>
             </div>
           </div>
+          {/* <SelfPromoAd
+        title="Become a top creator on Tego.live"
+        description="Go live, complete daily tasks, and earn more every day."
+        ctaText="Apply for Creator Mode"
+        href="/creator/apply"
+      /> */}
 
           {/* Reasons */}
           <div className="mt-1 space-y-1.5 max-h-40 overflow-y-auto pr-1">
@@ -1233,6 +1241,8 @@ export default function VideoCall({
             <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5" />
           </div>
         </div>
+        {/* 1️⃣ Display ad */}
+      <DisplayAdResponsive />
 
         {/* Right side controls (Skip / Next / Mic / Cam) */}
         <div className="absolute right-3 sm:right-4 bottom-28 md:bottom-8 z-30 flex flex-col items-center gap-3">

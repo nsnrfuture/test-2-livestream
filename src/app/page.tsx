@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import type { Status } from "@/components/ACCENT";
 import { supabase } from "@/lib/supabaseClient";
 import PrivacyTermsConsent from "@/components/ui/PrivacyTermsConsent";
-
+import { DisplayAdResponsive, InFeedAd, MultiplexAd } from "@/components/ads/AdSlots";
+// import SelfPromoAd from "@/components/ads/SelfPromoAd";
 
 const people = [
   {
@@ -262,6 +263,8 @@ export default function HomePage() {
               Safe, fun, and completely free.
             </p>
           </div>
+          {/* 1️⃣ Display ad */}
+      <DisplayAdResponsive />
 
           {/* Main Grid */}
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] mb-12">
@@ -276,6 +279,8 @@ export default function HomePage() {
                 muted
                 className="absolute inset-0 h-full w-full object-cover"
               />
+               {/* Put an In-Feed Ad in the middle */}
+        <InFeedAd />
 
               {/* Top-left Button */}
               <div className="absolute left-4 top-4 flex flex-col gap-3 z-10">
@@ -283,6 +288,12 @@ export default function HomePage() {
                   <Maximize2 className="h-5 w-5 text-[#E0E7FF]" />
                 </button>
               </div>
+            {/* <  SelfPromoAd
+        title="Become a top creator on Tego.live"
+        description="Go live, complete daily tasks, and earn more every day."
+        ctaText="Apply for Creator Mode"
+        href="/creator/apply"
+      /> */}
 
               {/* Left-middle fun controls */}
               <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-10">
