@@ -294,6 +294,8 @@ export default function HomePage() {
         ctaText="Apply for Creator Mode"
         href="/creator/apply"
       /> */}
+          {/* 3️⃣ Multiplex ad */}
+      <MultiplexAd />
 
               {/* Left-middle fun controls */}
               <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-10">

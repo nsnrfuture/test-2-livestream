@@ -202,7 +202,8 @@ function ReportPopup({
         ctaText="Apply for Creator Mode"
         href="/creator/apply"
       /> */}
-
+    {/* 3️⃣ Multiplex ad */}
+      <MultiplexAd />
           {/* Reasons */}
           <div className="mt-1 space-y-1.5 max-h-40 overflow-y-auto pr-1">
             {REPORT_REASONS.map((reason) => {
@@ -1171,6 +1172,7 @@ export default function VideoCall({
             )}
           </div>
         </div>
+        <InFeedAd/>
 
         {/* RTC mini status */}
         <div className="absolute top-12 right-3 sm:right-4 z-20">
