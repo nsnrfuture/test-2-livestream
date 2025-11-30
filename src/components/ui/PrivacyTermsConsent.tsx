@@ -2,15 +2,20 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ShieldAlert } from "lucide-react"; // <-- NEW ICON
+import { ShieldAlert } from "lucide-react"; // <-- ICON
 
 export default function PrivacyTermsConsent() {
   const [isOpen, setIsOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
+  // ✅ 3 SECOND DELAY BEFORE SHOWING POPUP
   useEffect(() => {
-    setIsOpen(true); // always show
-    setHydrated(true);
+    const timer = setTimeout(() => {
+      setIsOpen(true);
+      setHydrated(true);
+    }, 3000); // 3 sec delay
+
+    return () => clearTimeout(timer);
   }, []);
 
   if (!hydrated || !isOpen) return null;
@@ -26,7 +31,7 @@ export default function PrivacyTermsConsent() {
         {/* Glow effect */}
         <div className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 h-28 w-28 rounded-full bg-sky-500/20 blur-2xl" />
 
-        {/* Lucide Privacy Icon */}
+        {/* Icon */}
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-300 shadow-inner">
           <ShieldAlert className="h-8 w-8" strokeWidth={1.6} />
         </div>
