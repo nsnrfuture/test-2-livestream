@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { Eye, EyeOff } from "lucide-react";
+import { subscribeUserToPush } from "@/lib/pushClient";   // 👈 NEW IMPORT
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,8 +37,17 @@ export default function LoginPage() {
 
       if (error) {
         setError(error.message);
-      } else if (data.session) {
+      } else if (data.user) {
         setMessage("Login successful!");
+
+        // 🔔 1) Login successful → trigger push subscribe
+        try {
+          await subscribeUserToPush(data.user.id);   // 👈 POPUP HERE
+        } catch (err) {
+          console.log("Push subscribe error", err);
+        }
+
+        // 🔁 2) Redirect after subscription
         router.push("/");
       }
     } catch (err: any) {
@@ -73,7 +83,7 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Password + Forgot link */}
+          {/* Password + toggle */}
           <div className="space-y-1">
             <label className="block text-sm text-neutral-300">Password</label>
             <div className="relative">
@@ -105,19 +115,21 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Messages */}
+          {/* Errors */}
           {error && (
             <div className="text-sm text-red-400 bg-red-950/40 border border-red-900/60 rounded-lg px-3 py-2">
               {error}
             </div>
           )}
+
+          {/* Success */}
           {message && (
             <div className="text-sm text-emerald-400 bg-emerald-950/40 border border-emerald-900/60 rounded-lg px-3 py-2">
               {message}
             </div>
           )}
 
-          {/* Submit button */}
+          {/* Button */}
           <button
             type="submit"
             disabled={loading}
@@ -127,7 +139,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Footer link */}
         <p className="mt-4 text-xs text-neutral-400 text-center">
           Don&apos;t have an account?{" "}
           <Link
