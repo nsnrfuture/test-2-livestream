@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import NotificationInit from "@/components/NotificationInit";
+import PushSubscriber from "@/components//PushSubscriber";
+
+
 
 import TegoHeader from "@/components/common/TegoHeader";
 import TegoFooter from "@/components/common/TegoFooter";
@@ -150,6 +154,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#111] text-white`}
       >
+        <NotificationInit />
+        <PushSubscriber userId={null} />
         <TegoHeader />
         <main className="min-h-screen">{children}</main>
         <TegoFooter />
