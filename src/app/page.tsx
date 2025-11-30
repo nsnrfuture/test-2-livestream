@@ -5,6 +5,8 @@ import { Maximize2, Sparkles, Smile, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { Status } from "@/components/ACCENT";
 import { supabase } from "@/lib/supabaseClient";
+import PrivacyTermsConsent from "@/components/ui/PrivacyTermsConsent";
+
 
 const people = [
   {
@@ -467,6 +469,13 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
+
+            {/* Policy / Terms popup */}
+      <PrivacyTermsConsent />
+
+      {/* Your existing home page content */}
+
+
           </div>
         </div>
       </section>
