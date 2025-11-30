@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ShieldAlert } from "lucide-react"; // <-- NEW ICON
 
 export default function PrivacyTermsConsent() {
   const [isOpen, setIsOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    // Always show popup on every page load
-    setIsOpen(true);
+    setIsOpen(true); // always show
     setHydrated(true);
   }, []);
 
@@ -20,33 +20,15 @@ export default function PrivacyTermsConsent() {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-md animate-fadeIn">
-      <div className="relative mx-6 w-full max-w-md rounded-3xl bg-gradient-to-br from-slate-900/90 to-slate-800/80 border border-white/10 shadow-2xl p-7 animate-slideUp">
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 backdrop-blur-md animate-fadeIn">
+      <div className="relative mx-6 w-full max-w-md rounded-3xl bg-linear-to-br from-slate-900/90 to-slate-800/80 border border-white/10 shadow-2xl p-7 animate-slideUp">
 
-        {/* Glow circle */}
+        {/* Glow effect */}
         <div className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 h-28 w-28 rounded-full bg-sky-500/20 blur-2xl" />
 
-        {/* Icon */}
+        {/* Lucide Privacy Icon */}
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-300 shadow-inner">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-8 w-8"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.8}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 11c0-3.866-4-3.866-4 0 0 3.866 4 3.866 4 0z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M17.657 16.657A8 8 0 1112 4v0"
-            />
-          </svg>
+          <ShieldAlert className="h-8 w-8" strokeWidth={1.6} />
         </div>
 
         {/* Heading */}
@@ -62,20 +44,13 @@ export default function PrivacyTermsConsent() {
         {/* Description */}
         <p className="mt-4 text-center text-[15px] leading-relaxed text-slate-300">
           By using our website, you agree to our{" "}
-          <Link
-            href="/terms-and-conditions"
-            className="text-sky-300 font-semibold hover:underline"
-          >
+          <Link href="/terms-and-conditions" className="text-sky-300 font-semibold hover:underline">
             Terms & Conditions
           </Link>{" "}
           and{" "}
-          <Link
-            href="/privacy-policy"
-            className="text-sky-300 font-semibold hover:underline"
-          >
+          <Link href="/privacy-policy" className="text-sky-300 font-semibold hover:underline">
             Privacy Policy
-          </Link>
-          .
+          </Link>.
         </p>
 
         <p className="mt-2 text-center text-xs text-slate-400">
@@ -90,7 +65,7 @@ export default function PrivacyTermsConsent() {
           Accept & Continue
         </button>
 
-        {/* More info links */}
+        {/* More links */}
         <div className="mt-4 flex justify-between text-[11px] text-slate-400">
           <Link href="/privacy-policy" className="hover:text-sky-300 hover:underline">
             Privacy Policy
