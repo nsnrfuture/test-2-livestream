@@ -1,5 +1,5 @@
-// app/_components/NotificationInit.tsx
 "use client";
+
 import { useEffect } from "react";
 
 export default function NotificationInit() {
@@ -9,8 +9,12 @@ export default function NotificationInit() {
 
     navigator.serviceWorker
       .register("/sw.js")
-      .then(() => console.log("✅ SW registered"))
-      .catch(console.error);
+      .then((reg) => {
+        console.log("✅ SW registered with scope:", reg.scope);
+      })
+      .catch((err) => {
+        console.error("❌ SW register error", err);
+      });
   }, []);
 
   return null;
