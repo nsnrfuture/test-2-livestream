@@ -4,6 +4,7 @@ import "./globals.css";
 
 import TegoHeader from "@/components/common/TegoHeader";
 import TegoFooter from "@/components/common/TegoFooter";
+import Script from "next/script";
 
 // ---- Fonts ----
 const geistSans = Geist({
@@ -37,8 +38,6 @@ export const metadata: Metadata = {
     "Tego.live real-time connection",
 
     // Main use-cases
-    "random video chat app",
-    "random video call platform",
     "live video chat app",
     "live streaming platform",
     "live streaming app India",
@@ -48,49 +47,14 @@ export const metadata: Metadata = {
     "real-time video communication",
     "one-to-one live video chat",
     "browser-based video calling app",
-    "web-based random video chat",
+    "web-based  video chat",
     "no app needed video call platform",
-
-    // Stranger / social discovery
-    "random chat with strangers",
-    "talk to strangers online live",
-    "find stranger to chat",
-    "find strangers online",
-    "talk to random stranger",
-    "video chat with strangers",
-    "chat with unknown people",
-    "stranger video calling website",
-    "stranger video call India",
-    "stranger chat website",
-    "live stranger video chat platform",
-    "global live connection app",
-    "global social discovery platform",
-    "meet people instantly online",
-    "connect with new people online",
-    "meet people around the world",
-    "live chat with global users",
-
-    // Girl / boy discovery (safe phrasing)
-    "find girl for video chat",
-    "find boy for video chat",
-    "find girls online to talk",
-    "find boys online to chat",
-    "online video chat with random girls",
-    "online video call with random boys",
-    "meet new girls on video chat",
-    "find new boys to talk instantly",
-    "chat with random girls",
-    "chat with random boys",
-    "meet random girls online",
-    "meet random boys online",
-    "random girl video call",
-    "random boy video call",
-    "live chat with girls worldwide",
-    "live chat with boys worldwide",
 
     // Product positioning
     "best live stream platform 2025",
+    "best live stream platform 2026",
     "best stranger chat website 2025",
+    "best stranger chat website 2026",
     "best Indian video chat app",
     "best live video calling site",
     "best live connection site",
@@ -108,7 +72,7 @@ export const metadata: Metadata = {
     "Agora video call app",
     "AI-powered live stream",
     "AI-based live streaming app",
-    "AI-powered random chat",
+    "AI-powered video chat",
 
     // Monetization / creator angle
     "HD live stream for influencers",
@@ -119,6 +83,7 @@ export const metadata: Metadata = {
     "alternative to azar video chat",
     "chatroulette alternative website",
     "omegle alternative 2025",
+    "omegle alternative 2026",
 
     // Safety / frictionless entry
     "free video chat without login",
@@ -155,25 +120,8 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "https://tego.live",
   },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-image-preview": "large",
-      "max-video-preview": -1,
-      "max-snippet": -1,
-    },
-  },
-  icons: {
-    icon: "https://tego.live/tegologo.png",
-    shortcut: "https://tego.live/tegologo.png",
-    apple: "https://tego.live/tegologo.png",
-  },
-  metadataBase: new URL("https://tego.live"),
-  themeColor: "#050816",
 };
+
 
 // ---- Layout ----
 export default function RootLayout({
@@ -183,6 +131,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      {/* Google tag (gtag.js) */}
+      <Script
+        async
+        src="https://www.googletagmanager.com/gtag/js?id=AW-17765380641"
+        strategy="afterInteractive"
+      />
+      <Script id="gtag-init" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'AW-17765380641');
+        `}
+      </Script>
+
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#111] text-white`}
       >
