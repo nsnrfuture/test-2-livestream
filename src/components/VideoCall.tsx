@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
-// 👉 Type-only import is safe for SSR
+// Type-only import is safe for SSR
 import type {
   IAgoraRTCClient,
   ICameraVideoTrack,
@@ -29,6 +29,7 @@ import {
   SkipForward,
   Dot,
   X,
+  Flag,
 } from "lucide-react";
 
 type Facing = "user" | "environment";
@@ -37,7 +38,7 @@ type Props = {
   getToken: (channel: string, uid: number) => Promise<string>;
   onLeave?: () => void;
   userId: string; // Supabase auth user id
-  uid?: number; // optional: agar khud uid dena ho
+  uid?: number; // optional: if you want to pass a specific Agora UID
 };
 
 let AgoraRTC: any | null = null;
@@ -55,12 +56,17 @@ type RatingPopupProps = {
   onClose: () => void;
 };
 
-function RatingPopup({ open, currentRating, onRate, onClose }: RatingPopupProps) {
+function RatingPopup({
+  open,
+  currentRating,
+  onRate,
+  onClose,
+}: RatingPopupProps) {
   if (!open) return null;
 
   const handleRate = (star: number) => {
     onRate(star);
-    onClose(); // user ne rating de di => popup band
+    onClose(); // after rating, close the popup
   };
 
   return (
@@ -82,7 +88,7 @@ function RatingPopup({ open, currentRating, onRate, onClose }: RatingPopupProps)
             Rate this chat experience
           </h3>
           <p className="text-[11px] text-white/60 text-center">
-            Ye rating aapka next match experience improve karne ke liye hai.
+            This rating helps us improve your future match experience.
           </p>
 
           <div className="mt-2 flex gap-2">
@@ -108,6 +114,157 @@ function RatingPopup({ open, currentRating, onRate, onClose }: RatingPopupProps)
           <span className="mt-1 text-[10px] text-white/50">
             Tap any star to submit
           </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------- Report Popup Component ---------------------- */
+
+type ReportPopupProps = {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (reason: string, note: string) => Promise<void> | void;
+  submitting?: boolean;
+};
+
+const REPORT_REASONS = [
+  "Nudity / sexual content",
+  "Misbehave / harassment",
+  "Under age",
+  "Spam / promotion",
+  "Fake user / catfish",
+  "Fraud / scam",
+];
+
+function ReportPopup({
+  open,
+  onClose,
+  onSubmit,
+  submitting,
+}: ReportPopupProps) {
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedReason(null);
+      setNote("");
+      setError(null);
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const handleSubmit = async () => {
+    if (!selectedReason) {
+      setError("Please select a reason to report this user.");
+      return;
+    }
+    setError(null);
+    await onSubmit(selectedReason, note.trim());
+  };
+
+  return (
+    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="relative w-[92%] max-w-sm rounded-2xl bg-[#050816]/95 border border-white/10 px-4 py-5 shadow-2xl">
+        {/* Close */}
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={!!submitting}
+          className="absolute right-2 top-2 p-1 rounded-full hover:bg-white/10 text-white/70 disabled:opacity-50"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="flex flex-col gap-3 mt-1">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-red-500/20 text-red-400">
+              <Flag className="h-3.5 w-3.5" />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-white">
+                Report this user
+              </h3>
+              <p className="text-[11px] text-white/60">
+                If someone breaks the rules, you can report them here.
+              </p>
+            </div>
+          </div>
+
+          {/* Reasons */}
+          <div className="mt-1 space-y-1.5 max-h-40 overflow-y-auto pr-1">
+            {REPORT_REASONS.map((reason) => {
+              const active = selectedReason === reason;
+              return (
+                <button
+                  key={reason}
+                  type="button"
+                  onClick={() => setSelectedReason(reason)}
+                  className={`w-full flex items-center justify-between rounded-xl border px-3 py-2 text-[11px] text-left transition-all ${
+                    active
+                      ? "bg-red-500/15 border-red-400/70 text-red-100"
+                      : "bg-white/5 border-white/15 text-white/80 hover:bg-white/10"
+                  }`}
+                >
+                  <span className="pr-4">{reason}</span>
+                  <span
+                    className={`h-4 w-4 rounded-full border flex items-center justify-center text-[9px] ${
+                      active
+                        ? "border-red-400 bg-red-500/80 text-black"
+                        : "border-white/30 text-transparent"
+                    }`}
+                  >
+                    ✓
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Note */}
+          <div className="mt-2">
+            <label className="block text-[11px] text-white/60 mb-1">
+              Additional details (optional)
+            </label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="You can describe what happened (language, behaviour, etc.)."
+              className="w-full rounded-xl bg-black/40 border border-white/15 text-[11px] text-white px-3 py-2 outline-none focus:border-red-400/70 resize-none"
+            />
+          </div>
+
+          {error && (
+            <p className="text-[10px] text-red-400 mt-1">{error}</p>
+          )}
+
+          {/* Actions */}
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={!!submitting}
+              className="text-[11px] px-3 py-1.5 rounded-full border border-white/15 text-white/80 hover:bg-white/5 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!!submitting}
+              className="inline-flex items-center gap-1.5 text-[11px] px-3.5 py-1.5 rounded-full bg-red-500 text-black font-semibold hover:bg-red-400 disabled:opacity-60"
+            >
+              {submitting && (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              )}
+              <span>Submit report</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -152,19 +309,23 @@ export default function VideoCall({
   // current DB session id (video_sessions)
   const [sessionId, setSessionId] = useState<string | null>(null);
 
-  // 🔁 Refs to persist latest cam/mic state across joins
+  // Persist latest cam/mic state across joins
   const videoEnabledRef = useRef(videoEnabled);
   const audioEnabledRef = useRef(audioEnabled);
 
-  // ⏱ Stranger session start time
+  // Stranger session start time
   const sessionStartRef = useRef<string | null>(null);
 
-  // ⭐ Stranger rating + note
+  // Stranger rating + note
   const [strangerRating, setStrangerRating] = useState<number | null>(null);
   const [strangerNote, setStrangerNote] = useState<string>("");
 
-  // ⭐ Popup visibility
+  // Popup visibility
   const [showRatingPopup, setShowRatingPopup] = useState(false);
+
+  // Report popup state
+  const [showReportPopup, setShowReportPopup] = useState(false);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
 
   useEffect(() => {
     videoEnabledRef.current = videoEnabled;
@@ -304,7 +465,7 @@ export default function VideoCall({
           : undefined
       );
 
-      // 🔑 Respect current mic/cam toggles
+      // Respect current mic/cam toggles
       await mic.setEnabled(audioEnabledRef.current);
       await cam.setEnabled(videoEnabledRef.current);
 
@@ -439,7 +600,7 @@ export default function VideoCall({
             userDevice: navigator.userAgent ?? "Unknown",
             ratingGiven: strangerRating,
             notes: strangerNote || null,
-            reason,
+            sessionEndReason: reason,
           }),
         });
       } catch (err) {
@@ -454,6 +615,43 @@ export default function VideoCall({
     [channel, joinedChannel, strangerRating, strangerNote, userId]
   );
 
+  /* --------------------- Report submit handler -------------------------- */
+
+  const submitReport = useCallback(
+    async (reason: string, note: string) => {
+      if (!userId) return;
+      const ch = joinedChannel || channel;
+
+      try {
+        setReportSubmitting(true);
+
+        await fetch("/api/strangers/report", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            channel: ch,
+            userId,
+            sessionId,
+            reason,
+            note: note || null,
+          }),
+        });
+
+        console.log("[Report] submitted", {
+          channel: ch,
+          userId,
+          reason,
+        });
+        setShowReportPopup(false);
+      } catch (err) {
+        console.error("[Report] failed:", err);
+      } finally {
+        setReportSubmitting(false);
+      }
+    },
+    [channel, joinedChannel, sessionId, userId]
+  );
+
   /* ----------------- Stranger matching (match_queue) -------------------- */
 
   const getNextStranger = useCallback(async (): Promise<{ channel: string }> => {
@@ -464,10 +662,10 @@ export default function VideoCall({
       };
     }
 
-    // 1) Apni purani queue rows hatao
+    // 1) Clean up this user's old queue rows
     await supabase.from("match_queue").delete().eq("user_id", userId);
 
-    // 2) Purane rows cleanup
+    // 2) Remove old rows (older than 5 min)
     const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     await supabase
       .from("match_queue")
@@ -475,7 +673,7 @@ export default function VideoCall({
       .lt("created_at", cutoff)
       .eq("user_id", userId);
 
-    // 3) Koi waiting user dhundo
+    // 3) Try to find a waiting partner
     const { data: partner, error: partnerError } = await supabase
       .from("match_queue")
       .select("*")
@@ -559,7 +757,7 @@ export default function VideoCall({
         const token = await getToken(ch, u);
         await client.join(AGORA_APP_ID, ch, token, u);
 
-        // 🔁 Reuse existing tracks if present, else create new
+        // Reuse existing tracks if present, else create new
         let mic = localAudioTrack;
         let cam = localVideoTrack;
 
@@ -594,12 +792,13 @@ export default function VideoCall({
         joinStateRef.current = "joined";
         console.log("[Agora] joined", ch, "as", u);
 
-        // ⏱ call start time
+        // Call start time
         sessionStartRef.current = new Date().toISOString();
 
-        // naya match start -> rating reset + popup ko band rakho
+        // New match starts -> reset rating and hide popups
         setStrangerRating(null);
         setShowRatingPopup(false);
+        setShowReportPopup(false);
 
         await openSession({ channel: ch, agoraUid: u, startReason: "join" });
       } catch (err: any) {
@@ -643,7 +842,7 @@ export default function VideoCall({
     ) => {
       const destroyTracks = opts?.destroyTracks ?? true;
 
-      // 🔹 sabse pehle stranger_sessions ke liye log bhej do
+      // First, send stranger_sessions log
       await sendStrangerSession(reason);
 
       if (joinStateRef.current === "idle" || !client) {
@@ -756,7 +955,7 @@ export default function VideoCall({
   /* ----------------------- Next / Skip logic ---------------------------- */
 
   const nextStranger = useCallback(async () => {
-    // ⚠️ Skip / Next: DO NOT destroy local tracks
+    // Skip / Next: DO NOT destroy local tracks
     await leaveChannel("next", { destroyTracks: false });
 
     const { channel: newChannel } = await getNextStranger();
@@ -818,7 +1017,7 @@ export default function VideoCall({
   /* -------------------- Initial join + cleanup -------------------------- */
 
   useEffect(() => {
-    // 👈 IMPORTANT: userId ke bina match mat karo
+    // Do not match if there is no userId
     if (!client || !userId) return;
     let cancelled = false;
 
@@ -856,11 +1055,11 @@ export default function VideoCall({
   /* --------- Mid-call rating popup trigger (e.g. 20s after join) -------- */
 
   useEffect(() => {
-    // Jab bhi naya channel join hota hai, thodi der baad popup dikhao
+    // When a new channel is joined, show the rating popup after some time
     if (!joinedChannel) return;
     const timeout = setTimeout(() => {
       setShowRatingPopup(true);
-    }, 20_000); // 20 seconds ke baad popup
+    }, 20_000); // show after 20 seconds
 
     return () => clearTimeout(timeout);
   }, [joinedChannel]);
@@ -920,6 +1119,14 @@ export default function VideoCall({
           onClose={() => setShowRatingPopup(false)}
         />
 
+        {/* Report Popup */}
+        <ReportPopup
+          open={showReportPopup}
+          onClose={() => setShowReportPopup(false)}
+          onSubmit={submitReport}
+          submitting={reportSubmitting}
+        />
+
         {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 sm:px-4 py-2">
           <div className="flex flex-col items-start gap-1">
@@ -951,7 +1158,7 @@ export default function VideoCall({
             {!videoEnabled && (
               <Pill bg="bg-red-600/80">
                 <CameraOff className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Cam Off</span>
+                <span className="hidden sm:inline">Camera Off</span>
               </Pill>
             )}
           </div>
@@ -982,6 +1189,23 @@ export default function VideoCall({
           <div className="relative">
             <div className="absolute inset-0 bg-black/95 ring-1 ring-white/10" />
             <div ref={remoteRef} className="absolute inset-0" />
+
+            {/* Top-left controls for Stranger (label + report) */}
+            <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
+              <Pill>
+                <User className="h-3.5 w-3.5" />
+                Stranger
+              </Pill>
+              <button
+                type="button"
+                onClick={() => setShowReportPopup(true)}
+                className="inline-flex items-center gap-1 rounded-full bg-red-500/90 text-black text-[11px] font-semibold px-2.5 py-1 shadow-lg hover:bg-red-400"
+              >
+                <Flag className="h-3.5 w-3.5" />
+                <span>Report</span>
+              </button>
+            </div>
+
             <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-black/20" />
             <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5" />
           </div>
@@ -1048,7 +1272,7 @@ export default function VideoCall({
             </span>
           </>
 
-          {/* Cam toggle */}
+          {/* Camera toggle */}
           <RoundBtn
             onClick={() => toggleVideo(!videoEnabled)}
             title={videoEnabled ? "Turn camera off" : "Turn camera on"}
@@ -1060,13 +1284,13 @@ export default function VideoCall({
             )}
           </RoundBtn>
           <span className="text-[10px] text-white/90 drop-shadow">
-            {videoEnabled ? "Cam On" : "Cam Off"}
+            {videoEnabled ? "Camera On" : "Camera Off"}
           </span>
 
           {/* Mic toggle */}
           <RoundBtn
             onClick={() => toggleAudio(!audioEnabled)}
-            title={audioEnabled ? "Mute mic" : "Unmute mic"}
+            title={audioEnabled ? "Mute microphone" : "Unmute microphone"}
           >
             {audioEnabled ? (
               <Mic className="h-5 w-5" />
