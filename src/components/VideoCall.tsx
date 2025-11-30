@@ -14,7 +14,11 @@ import type {
 
 import { AGORA_APP_ID } from "@/lib/agora";
 import { supabase } from "@/lib/supabaseClient";
-import { DisplayAdResponsive, InFeedAd, MultiplexAd } from "@/components/ads/AdSlots";
+import {
+  DisplayAdResponsive,
+  InFeedAd,
+  MultiplexAd,
+} from "@/components/ads/AdSlots";
 // import SelfPromoAd from "@/components/ads/SelfPromoAd";
 
 import {
@@ -202,8 +206,9 @@ function ReportPopup({
         ctaText="Apply for Creator Mode"
         href="/creator/apply"
       /> */}
-    {/* 3️⃣ Multiplex ad */}
-      <MultiplexAd />
+          {/* 3️⃣ Multiplex ad */}
+          <MultiplexAd />
+
           {/* Reasons */}
           <div className="mt-1 space-y-1.5 max-h-40 overflow-y-auto pr-1">
             {REPORT_REASONS.map((reason) => {
@@ -336,6 +341,9 @@ export default function VideoCall({
   const [showReportPopup, setShowReportPopup] = useState(false);
   const [reportSubmitting, setReportSubmitting] = useState(false);
 
+  // ⭐ One-time-per-day rating popup control
+  const [canShowRatingToday, setCanShowRatingToday] = useState(false);
+
   useEffect(() => {
     videoEnabledRef.current = videoEnabled;
   }, [videoEnabled]);
@@ -365,6 +373,18 @@ export default function VideoCall({
       mounted = false;
     };
   }, [client]);
+
+  /* ----------------- One-time-per-day rating flag ----------------- */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const key = `tego.strangerRatingPrompt.${today}`;
+    const alreadyShown = window.localStorage.getItem(key);
+
+    // If not shown yet today, we allow showing it once
+    setCanShowRatingToday(!alreadyShown);
+  }, []);
 
   /* ------------------------- UI tiny components ------------------------- */
 
@@ -1064,14 +1084,31 @@ export default function VideoCall({
   /* --------- Mid-call rating popup trigger (e.g. 20s after join) -------- */
 
   useEffect(() => {
-    // When a new channel is joined, show the rating popup after some time
-    if (!joinedChannel) return;
+    // Only show once per day, even if user joins many channels
+    if (!joinedChannel || !canShowRatingToday) return;
+
+    if (typeof window !== "undefined") {
+      const today = new Date().toISOString().slice(0, 10);
+      const key = `tego.strangerRatingPrompt.${today}`;
+
+      try {
+        // Mark as "shown today" immediately when we schedule it
+        window.localStorage.setItem(key, "1");
+      } catch (e) {
+        console.warn("[RatingPopup] localStorage failed:", e);
+      }
+    }
+
+    // Show after 20 seconds
     const timeout = setTimeout(() => {
       setShowRatingPopup(true);
-    }, 20_000); // show after 20 seconds
+    }, 20_000);
+
+    // After this, don't show again today
+    setCanShowRatingToday(false);
 
     return () => clearTimeout(timeout);
-  }, [joinedChannel]);
+  }, [joinedChannel, canShowRatingToday]);
 
   /* ---------------------- Simple toggles + UI data ---------------------- */
 
@@ -1172,7 +1209,8 @@ export default function VideoCall({
             )}
           </div>
         </div>
-        <InFeedAd/>
+
+        <InFeedAd />
 
         {/* RTC mini status */}
         <div className="absolute top-12 right-3 sm:right-4 z-20">
@@ -1243,8 +1281,9 @@ export default function VideoCall({
             <div className="pointer-events-none absolute inset-0 ring-1 ring-white/5" />
           </div>
         </div>
+
         {/* 1️⃣ Display ad */}
-      <DisplayAdResponsive />
+        <DisplayAdResponsive />
 
         {/* Right side controls (Skip / Next / Mic / Cam) */}
         <div className="absolute right-3 sm:right-4 bottom-28 md:bottom-8 z-30 flex flex-col items-center gap-3">
